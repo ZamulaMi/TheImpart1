@@ -16,16 +16,6 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-// Логування всіх запитів для відстеження
-const logFile = '/tmp/server_requests.log';
-app.use((req, res, next) => {
-  const logLine = `[${new Date().toISOString()}] ${req.method} ${req.url} | Host: ${req.headers.host} | Origin: ${req.headers.origin}\n`;
-  try {
-    fs.appendFileSync(logFile, logLine);
-  } catch {}
-  next();
-});
-
 // CORS та preflight-запити
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
