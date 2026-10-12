@@ -4,7 +4,7 @@ import { safeExecuteSql } from './_db.ts';
 import { verifyAdminToken, extractToken } from './_auth_utils.ts';
 import { initResponseHelpers, parseRequestBody } from './_helpers.ts';
 import { DEFAULT_TAXONOMIES } from '../src/utils/taxonomies.ts';
-import { TaxonomiesData } from '../src/types.ts';
+import type { TaxonomiesData } from '../src/types.ts';
 
 export interface SocialLinksSet {
   telegram?: string;

@@ -1,122 +1,18 @@
 [
   {
-    "id": "1",
-    "title": "Архітектура спостереження: як простір формує досвід",
-    "excerpt": "Чисті лінії, природне світло та відсутність візуального шуму як основа свідомого сприйняття навколишнього середовища.",
-    "content": "<p>Простір навколо нас не є нейтральним. Він або розсіює нашу увагу, або збирає її в одну фокусну точку. Архітектура, яка поважає людину, не намагається вразити масштабом — вона створює умови для внутрішнього діалогу.</p><p>Світло, що падає крізь високі вікна, текстура натурального каменю чи дерева, біла стіна, на якій грають тіні дерев у другій половині дня — це прості речі, що повертають відчуття присутності тут і тепер.</p>",
-    "category": "Архітектура, Статті",
-    "categories": ["Архітектура", "Статті"],
-    "topics": ["Простір", "Світло та тінь", "Форма"],
-    "author": "Олена Кравченко",
-    "coverImage": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1400&q=80",
-    "date": "28 вересня 2026",
-    "readTime": "3 хв читання",
-    "createdAt": "2026-09-28T10:00:00.000Z",
-    "published": true,
-    "titleEn": "The Architecture of Observation: How Space Shapes Experience",
-    "excerptEn": "Clean lines, natural light, and the absence of visual noise as the foundation of conscious environmental perception.",
-    "contentEn": "<p>The space around us is never neutral. It either disperses our attention or gathers it into a single focal point. Architecture that respects the individual does not seek to overwhelm by scale — it creates conditions for interior dialogue.</p><p>Light descending through tall windows, the texture of natural stone or wood, a white wall where tree shadows play in the late afternoon — these are simple elements that restore our sense of presence in the here and now.</p>",
-    "categoryEn": "Architecture, Articles",
-    "categoriesEn": ["Architecture", "Articles"],
-    "topicsEn": ["Space", "Light & Shadow", "Form"],
-    "publishedEn": true
-  },
-  {
-    "id": "2",
-    "title": "Естетика мінімалізму в сучасному урбаністичному дизайні",
-    "excerpt": "Як відмова від зайвого допомагає віднайти сутність у міському середовищі та повсякденних речах.",
-    "content": "<p>Мінімалізм — це не просто стилістичний вибір, це філософія відмови від надлишкового заради змістовного. У світі, перевантаженому візуальними стимулами, простір стає найбільшою розкішшю.</p><p>Коли ми прибираємо другорядні деталі, кожен матеріал починає промовляти сам за себе: теплота необробленого дерева, холодна стриманість бетону, прозорість скла.</p>",
-    "category": "Дизайн, Статті",
-    "categories": ["Дизайн", "Статті"],
-    "topics": ["Мінімалізм", "Матеріальність", "Гармонія"],
-    "author": "Маркіян Замула",
-    "coverImage": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80",
-    "date": "30 вересня 2026",
-    "readTime": "4 хв читання",
-    "createdAt": "2026-09-30T12:00:00.000Z",
-    "published": true,
-    "titleEn": "The Aesthetics of Minimalism in Modern Urban Design",
-    "excerptEn": "How eliminating excess helps discover essence in urban environments and everyday objects.",
-    "contentEn": "<p>Minimalism is not merely a stylistic preference; it is a philosophy of shedding the redundant for the sake of the meaningful. In a world inundated with visual stimuli, space itself becomes the ultimate luxury.</p><p>When secondary details are removed, every material speaks for itself: the warmth of raw timber, the disciplined cool of concrete, the honesty of glass.</p>",
-    "categoryEn": "Design, Articles",
-    "categoriesEn": ["Design", "Articles"],
-    "topicsEn": ["Minimalism", "Materiality", "Harmony"],
-    "publishedEn": true
-  },
-  {
-    "id": "3",
-    "title": "Огляд: Павільйон сучасної культури та нові просторові практики",
-    "excerpt": "Аналіз нової архітектурної споруди, що поєднує публічний простір, виставкову галерею та природний ландшафт.",
-    "content": "<p>Новий павільйон культури демонструє принципово інший підхід до взаємодії будівлі з довкіллям. Замість монументального ізольованого об'єму автори запропонували відкриту структуру з розмитими межами між інтер'єром і ландшафтом.</p><p>Таке рішення запрошує відвідувача стати співучасником просторового дійства, де мистецтво існує в природному освітленні та постійній динаміці дня.</p>",
-    "category": "Огляди, Культура",
-    "categories": ["Огляди", "Культура"],
-    "topics": ["Простір", "Культура"],
-    "author": "Редакція The Impart",
-    "coverImage": "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1400&q=80",
-    "date": "1 жовтня 2026",
-    "readTime": "5 хв читання",
-    "createdAt": "2026-10-01T14:30:00.000Z",
-    "published": true,
-    "titleEn": "Review: The Pavilion of Contemporary Culture and Spatial Practices",
-    "excerptEn": "An architectural critique of a public pavilion merging gallery spaces with natural landscape.",
-    "contentEn": "<p>The new cultural pavilion demonstrates a fundamentally different approach to architectural interaction with its surroundings. Rather than an isolated monument, the design provides an open framework with permeable boundaries between interior and landscape.</p><p>Visitors become co-creators of the spatial experience, where art breathes in changing natural daylight.</p>",
-    "categoryEn": "Reviews, Culture",
-    "categoriesEn": ["Reviews", "Culture"],
-    "topicsEn": ["Space", "Culture"],
-    "publishedEn": true
-  },
-  {
-    "id": "4",
-    "title": "Новини: Відкриття нової галереї експериментального мистецтва",
-    "excerpt": "У центрі міста розпочинає роботу інноваційний простір для молодих митців, дослідників звуку та архітектури.",
-    "content": "<p>Цього тижня відбулося відкриття нової експериментальної платформи, покликаної об'єднати сучасне візуальне мистецтво, архітектурні дослідження та саунд-арт.</p><p>Програма першого сезону включає серію публічних лекцій про урбаністику, воркшопи з аналогової фотографії та відкриті дискусії про майбутнє культурних інституцій.</p>",
-    "category": "Новини, Мистецтво",
-    "categories": ["Новини", "Мистецтво"],
-    "topics": ["Мистецтво", "Час"],
-    "author": "Редакція The Impart",
-    "coverImage": "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1400&q=80",
-    "date": "2 жовтня 2026",
-    "readTime": "2 хв читання",
-    "createdAt": "2026-10-02T09:15:00.000Z",
-    "published": true,
-    "titleEn": "News: Launch of the Experimental Art Gallery",
-    "excerptEn": "A progressive venue for emerging artists, sonic researchers, and architectural discourse opens its doors.",
-    "contentEn": "<p>This week marked the inaugural opening of a new experimental platform bringing together contemporary visual arts, architectural inquiry, and sound studies.</p><p>The season features open urbanism colloquia, photography labs, and panel discussions on the trajectory of cultural institutions.</p>",
-    "categoryEn": "News, Art",
-    "categoriesEn": ["News", "Art"],
-    "topicsEn": ["Art", "Time"],
-    "publishedEn": true
-  },
-  {
-    "id": "5",
-    "title": "Філософія тиші: чому акустика міста визначає якість життя",
-    "excerpt": "Дослідження звукового ландшафту сучасного мегаполісу та способів збереження акустичного комфорту.",
-    "content": "<p>Шум став невидимим, але всюдисущим фактором втоми у сучасних містах. Здатність архітектури формувати тишу — один із найвищих критеріїв її гуманності.</p><p>Використання звукопоглинальних фасадів, зелені зони як бар'єри та грамотне зонування вулиць здатні повернути мешканцям право на спокійне мислення.</p>",
-    "category": "Філософія, Статті",
-    "categories": ["Філософія", "Статті"],
-    "topics": ["Тиша", "Усвідомленість"],
-    "author": "Данило Грищенко",
-    "coverImage": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1400&q=80",
-    "date": "3 жовтня 2026",
-    "readTime": "4 хв читання",
-    "createdAt": "2026-10-03T11:00:00.000Z",
-    "published": true,
-    "titleEn": "The Philosophy of Silence: Why Urban Acoustics Shape Well-being",
-    "excerptEn": "Investigating the sonic landscape of contemporary cities and methods of acoustic preservation.",
-    "contentEn": "<p>Noise has become an unseen yet omnipresent source of fatigue in modern cities. An architecture capable of crafting silence embodies human consideration at its highest level.</p><p>Sound-absorbing textures, living acoustic buffer belts, and thoughtful pedestrian zoning restore the citizen's right to tranquil contemplation.</p>",
-    "categoryEn": "Philosophy, Articles",
-    "categoriesEn": ["Philosophy", "Articles"],
-    "topicsEn": ["Silence", "Mindfulness"],
-    "publishedEn": true
-  },
-  {
     "id": "6",
     "title": "Світло як будівельний матеріал: дослідження природної інсоляції",
     "excerpt": "Як природні промені змінюють сприйняття форми, площини та ритму впродовж світлового дня.",
     "content": "<p>Світло не лише освітлює простір — воно його конструює. Тіні, що повільно рухаються по текстурованій поверхні, додають статичній конструкції відчуття живого плину часу.</p><p>Майстерність архітектора полягає у передбаченні того, як будівля дихатиме разом із сонцем від світанку до сутінків.</p>",
     "category": "Архітектура, Огляди",
-    "categories": ["Архітектура", "Огляди"],
-    "topics": ["Світло та тінь", "Форма"],
+    "categories": [
+      "Архітектура",
+      "Огляди"
+    ],
+    "topics": [
+      "Світло та тінь",
+      "Форма"
+    ],
     "author": "Олена Кравченко",
     "coverImage": "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=1400&q=80",
     "date": "4 жовтня 2026",
@@ -127,8 +23,188 @@
     "excerptEn": "How solar rays dynamically reshape planes, surfaces, and volumes across the daylight hours.",
     "contentEn": "<p>Light does not merely illuminate space — it constructs it. Shadows gliding slowly across a textured surface endow static concrete with the cadence of flowing time.</p><p>An architect's craft resides in orchestrating how a structure breathes with the sun from dawn until twilight.</p>",
     "categoryEn": "Architecture, Reviews",
-    "categoriesEn": ["Architecture", "Reviews"],
-    "topicsEn": ["Light & Shadow", "Form"],
+    "categoriesEn": [
+      "Architecture",
+      "Reviews"
+    ],
+    "topicsEn": [
+      "Light & Shadow",
+      "Form"
+    ],
+    "publishedEn": true
+  },
+  {
+    "id": "5",
+    "title": "Філософія тиші: чому акустика міста визначає якість життя",
+    "excerpt": "Дослідження звукового ландшафту сучасного мегаполісу та способів збереження акустичного комфорту.",
+    "content": "<p>Шум став невидимим, але всюдисущим фактором втоми у сучасних містах. Здатність архітектури формувати тишу — один із найвищих критеріїв її гуманності.</p><p>Використання звукопоглинальних фасадів, зелені зони як бар'єри та грамотне зонування вулиць здатні повернути мешканцям право на спокійне мислення.</p>",
+    "category": "Філософія, Статті",
+    "categories": [
+      "Філософія",
+      "Статті"
+    ],
+    "topics": [
+      "Тиша",
+      "Усвідомленість"
+    ],
+    "author": "Данило Грищенко",
+    "coverImage": "https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1400&q=80",
+    "date": "3 жовтня 2026",
+    "readTime": "4 хв читання",
+    "createdAt": "2026-10-03T11:00:00.000Z",
+    "published": true,
+    "titleEn": "The Philosophy of Silence: Why Urban Acoustics Shape Well-being",
+    "excerptEn": "Investigating the sonic landscape of contemporary cities and methods of acoustic preservation.",
+    "contentEn": "<p>Noise has become an unseen yet omnipresent source of fatigue in modern cities. An architecture capable of crafting silence embodies human consideration at its highest level.</p><p>Sound-absorbing textures, living acoustic buffer belts, and thoughtful pedestrian zoning restore the citizen's right to tranquil contemplation.</p>",
+    "categoryEn": "Philosophy, Articles",
+    "categoriesEn": [
+      "Philosophy",
+      "Articles"
+    ],
+    "topicsEn": [
+      "Silence",
+      "Mindfulness"
+    ],
+    "publishedEn": true
+  },
+  {
+    "id": "4",
+    "title": "Новини: Відкриття нової галереї експериментального мистецтва",
+    "excerpt": "У центрі міста розпочинає роботу інноваційний простір для молодих митців, дослідників звуку та архітектури.",
+    "content": "<p>Цього тижня відбулося відкриття нової експериментальної платформи, покликаної об'єднати сучасне візуальне мистецтво, архітектурні дослідження та саунд-арт.</p><p>Програма першого сезону включає серію публічних лекцій про урбаністику, воркшопи з аналогової фотографії та відкриті дискусії про майбутнє культурних інституцій.</p>",
+    "category": "Новини, Мистецтво",
+    "categories": [
+      "Новини",
+      "Мистецтво"
+    ],
+    "topics": [
+      "Мистецтво",
+      "Час"
+    ],
+    "author": "Редакція The Impart",
+    "coverImage": "https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1400&q=80",
+    "date": "2 жовтня 2026",
+    "readTime": "2 хв читання",
+    "createdAt": "2026-10-02T09:15:00.000Z",
+    "published": true,
+    "titleEn": "News: Launch of the Experimental Art Gallery",
+    "excerptEn": "A progressive venue for emerging artists, sonic researchers, and architectural discourse opens its doors.",
+    "contentEn": "<p>This week marked the inaugural opening of a new experimental platform bringing together contemporary visual arts, architectural inquiry, and sound studies.</p><p>The season features open urbanism colloquia, photography labs, and panel discussions on the trajectory of cultural institutions.</p>",
+    "categoryEn": "News, Art",
+    "categoriesEn": [
+      "News",
+      "Art"
+    ],
+    "topicsEn": [
+      "Art",
+      "Time"
+    ],
+    "publishedEn": true
+  },
+  {
+    "id": "3",
+    "title": "Огляд: Павільйон сучасної культури та нові просторові практики",
+    "excerpt": "Аналіз нової архітектурної споруди, що поєднує публічний простір, виставкову галерею та природний ландшафт.",
+    "content": "<p>Новий павільйон культури демонструє принципово інший підхід до взаємодії будівлі з довкіллям. Замість монументального ізольованого об'єму автори запропонували відкриту структуру з розмитими межами між інтер'єром і ландшафтом.</p><p>Таке рішення запрошує відвідувача стати співучасником просторового дійства, де мистецтво існує в природному освітленні та постійній динаміці дня.</p>",
+    "category": "Огляди, Культура",
+    "categories": [
+      "Огляди",
+      "Культура"
+    ],
+    "topics": [
+      "Простір",
+      "Культура"
+    ],
+    "author": "Редакція The Impart",
+    "coverImage": "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1400&q=80",
+    "date": "1 жовтня 2026",
+    "readTime": "5 хв читання",
+    "createdAt": "2026-10-01T14:30:00.000Z",
+    "published": true,
+    "titleEn": "Review: The Pavilion of Contemporary Culture and Spatial Practices",
+    "excerptEn": "An architectural critique of a public pavilion merging gallery spaces with natural landscape.",
+    "contentEn": "<p>The new cultural pavilion demonstrates a fundamentally different approach to architectural interaction with its surroundings. Rather than an isolated monument, the design provides an open framework with permeable boundaries between interior and landscape.</p><p>Visitors become co-creators of the spatial experience, where art breathes in changing natural daylight.</p>",
+    "categoryEn": "Reviews, Culture",
+    "categoriesEn": [
+      "Reviews",
+      "Culture"
+    ],
+    "topicsEn": [
+      "Space",
+      "Culture"
+    ],
+    "publishedEn": true
+  },
+  {
+    "id": "2",
+    "title": "Естетика мінімалізму в сучасному урбаністичному дизайні",
+    "excerpt": "Як відмова від зайвого допомагає віднайти сутність у міському середовищі та повсякденних речах.",
+    "content": "<p>Мінімалізм — це не просто стилістичний вибір, це філософія відмови від надлишкового заради змістовного. У світі, перевантаженому візуальними стимулами, простір стає найбільшою розкішшю.</p><p>Коли ми прибираємо другорядні деталі, кожен матеріал починає промовляти сам за себе: теплота необробленого дерева, холодна стриманість бетону, прозорість скла.</p>",
+    "category": "Дизайн, Статті",
+    "categories": [
+      "Дизайн",
+      "Статті"
+    ],
+    "topics": [
+      "Мінімалізм",
+      "Матеріальність",
+      "Гармонія"
+    ],
+    "author": "Маркіян Замула",
+    "coverImage": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1400&q=80",
+    "date": "30 вересня 2026",
+    "readTime": "4 хв читання",
+    "createdAt": "2026-09-30T12:00:00.000Z",
+    "published": true,
+    "titleEn": "The Aesthetics of Minimalism in Modern Urban Design",
+    "excerptEn": "How eliminating excess helps discover essence in urban environments and everyday objects.",
+    "contentEn": "<p>Minimalism is not merely a stylistic preference; it is a philosophy of shedding the redundant for the sake of the meaningful. In a world inundated with visual stimuli, space itself becomes the ultimate luxury.</p><p>When secondary details are removed, every material speaks for itself: the warmth of raw timber, the disciplined cool of concrete, the honesty of glass.</p>",
+    "categoryEn": "Design, Articles",
+    "categoriesEn": [
+      "Design",
+      "Articles"
+    ],
+    "topicsEn": [
+      "Minimalism",
+      "Materiality",
+      "Harmony"
+    ],
+    "publishedEn": true
+  },
+  {
+    "id": "1",
+    "title": "Архітектура спостереження: як простір формує досвід",
+    "excerpt": "Чисті лінії, природне світло та відсутність візуального шуму як основа свідомого сприйняття навколишнього середовища.",
+    "content": "<p>Простір навколо нас не є нейтральним. Він або розсіює нашу увагу, або збирає її в одну фокусну точку. Архітектура, яка поважає людину, не намагається вразити масштабом — вона створює умови для внутрішнього діалогу.</p><p>Світло, що падає крізь високі вікна, текстура натурального каменю чи дерева, біла стіна, на якій грають тіні дерев у другій половині дня — це прості речі, що повертають відчуття присутності тут і тепер.</p>",
+    "category": "Архітектура, Статті",
+    "categories": [
+      "Архітектура",
+      "Статті"
+    ],
+    "topics": [
+      "Простір",
+      "Світло та тінь",
+      "Форма"
+    ],
+    "author": "Олена Кравченко",
+    "coverImage": "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1400&q=80",
+    "date": "28 вересня 2026",
+    "readTime": "3 хв читання",
+    "createdAt": "2026-09-28T10:00:00.000Z",
+    "published": true,
+    "titleEn": "The Architecture of Observation: How Space Shapes Experience",
+    "excerptEn": "Clean lines, natural light, and the absence of visual noise as the foundation of conscious environmental perception.",
+    "contentEn": "<p>The space around us is never neutral. It either disperses our attention or gathers it into a single focal point. Architecture that respects the individual does not seek to overwhelm by scale — it creates conditions for interior dialogue.</p><p>Light descending through tall windows, the texture of natural stone or wood, a white wall where tree shadows play in the late afternoon — these are simple elements that restore our sense of presence in the here and now.</p>",
+    "categoryEn": "Architecture, Articles",
+    "categoriesEn": [
+      "Architecture",
+      "Articles"
+    ],
+    "topicsEn": [
+      "Space",
+      "Light & Shadow",
+      "Form"
+    ],
     "publishedEn": true
   }
 ]

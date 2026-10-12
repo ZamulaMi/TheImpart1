@@ -1,7 +1,38 @@
 /**
  * Cloudflare D1 (SQL Database) & Cloudflare R2 (Object Storage) Client
- * Повністю видалено Vercel та Postgres/Neon — робота суто з серверами Cloudflare.
+ * Робота суто через Cloudflare API Tokens (Bearer Authorization).
  */
+
+import dotenv from 'dotenv';
+dotenv.config({ override: true });
+
+// Стан тимчасового блокування запитів при невірних облікових даних (запобігає спаму 401)
+let authDisabledUntil = 0;
+let lastReportedAuthMsg = '';
+
+function isAuthThrottled(): boolean {
+  return Date.now() < authDisabledUntil;
+}
+
+export function markAuthFailed(errorMsg: string): void {
+  authDisabledUntil = Date.now() + 60000; // 60 секунд паузи перед наступною спробою
+  if (lastReportedAuthMsg !== errorMsg) {
+    lastReportedAuthMsg = errorMsg;
+    console.warn(`[Cloudflare D1] ${errorMsg}`);
+  }
+}
+
+function cleanEnv(val: string | undefined): string {
+  if (!val) return '';
+  let str = val.trim();
+  if (
+    (str.startsWith('"') && str.endsWith('"')) ||
+    (str.startsWith("'") && str.endsWith("'"))
+  ) {
+    str = str.slice(1, -1).trim();
+  }
+  return str;
+}
 
 // 1. Конфігурація Cloudflare D1
 export interface CloudflareD1Config {
@@ -11,25 +42,21 @@ export interface CloudflareD1Config {
 }
 
 export function getCloudflareD1Config(): CloudflareD1Config | null {
-  const accountId = (
-    process.env.CLOUDFLARE_ACCOUNT_ID ||
-    process.env.CF_ACCOUNT_ID ||
-    ''
-  ).trim();
+  const accountId = cleanEnv(
+    process.env.CLOUDFLARE_ACCOUNT_ID || process.env.CF_ACCOUNT_ID
+  );
 
-  const databaseId = (
+  const databaseId = cleanEnv(
     process.env.CLOUDFLARE_DATABASE_ID ||
-    process.env.CLOUDFLARE_D1_DATABASE_ID ||
-    process.env.D1_DATABASE_ID ||
-    ''
-  ).trim();
+      process.env.CLOUDFLARE_D1_DATABASE_ID ||
+      process.env.D1_DATABASE_ID
+  );
 
-  const apiToken = (
-    process.env.CLOUDFLARE_API_TOKEN ||
+  const apiToken = cleanEnv(
     process.env.CLOUDFLARE_D1_TOKEN ||
-    process.env.CF_API_TOKEN ||
-    ''
-  ).trim();
+      process.env.CLOUDFLARE_API_TOKEN ||
+      process.env.CF_API_TOKEN
+  );
 
   if (accountId && databaseId && apiToken) {
     return { accountId, databaseId, apiToken };
@@ -39,7 +66,14 @@ export function getCloudflareD1Config(): CloudflareD1Config | null {
 }
 
 export function isCloudflareD1Configured(): boolean {
-  return getCloudflareD1Config() !== null;
+  return getCloudflareD1Config() !== null && !isAuthThrottled();
+}
+
+function getCloudflareAuthHeaders(apiToken: string): Record<string, string> {
+  const cleanToken = apiToken.replace(/^Bearer\s+/i, '').trim();
+  return {
+    Authorization: `Bearer ${cleanToken}`,
+  };
 }
 
 // 2. Виконання SQL-запитів до Cloudflare D1 через REST API
@@ -50,18 +84,18 @@ export async function queryCloudflareD1(
 ): Promise<any[]> {
   const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/d1/database/${config.databaseId}/query`;
 
-  // Нормалізація параметрів для SQLite у Cloudflare D1:
-  // booleans -> 1/0, undefined -> null
   const sanitizedParams = params.map((p) => {
     if (p === undefined) return null;
     if (typeof p === 'boolean') return p ? 1 : 0;
     return p;
   });
 
+  const authHeaders = getCloudflareAuthHeaders(config.apiToken);
+
   const response = await fetch(url, {
     method: 'POST',
     headers: {
-      Authorization: `Bearer ${config.apiToken}`,
+      ...authHeaders,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
@@ -69,6 +103,11 @@ export async function queryCloudflareD1(
       params: sanitizedParams,
     }),
   });
+
+  if (response.status === 401) {
+    markAuthFailed('Помилка автентифікації Cloudflare D1 (HTTP 401). Перевірте правильність токена CLOUDFLARE_API_TOKEN.');
+    return [];
+  }
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => '');
@@ -91,6 +130,10 @@ export async function queryCloudflareD1(
 
 // 3. Універсальний клієнт бази даних Cloudflare D1
 export function getDbClient(): any | null {
+  if (isAuthThrottled()) {
+    return null;
+  }
+
   const d1Config = getCloudflareD1Config();
   if (!d1Config) {
     return null;
@@ -127,7 +170,7 @@ export function getDbClient(): any | null {
 // 4. Безпечне виконання SQL-запиту з тайм-аутом
 export async function safeExecuteSql<T = any>(
   sqlFn: (sql: any) => Promise<T>,
-  timeoutMs: number = 6000
+  timeoutMs: number = 5000
 ): Promise<T | null> {
   const sql = getDbClient();
   if (!sql) return null;
@@ -140,8 +183,12 @@ export async function safeExecuteSql<T = any>(
       ),
     ]);
     return result;
-  } catch (err) {
-    console.warn('Cloudflare D1 query error/warning:', err);
+  } catch (err: any) {
+    if (err?.message?.includes('401') || err?.message?.includes('Authentication error')) {
+      markAuthFailed(err.message);
+    } else {
+      console.warn('Cloudflare D1 query notice:', err?.message || err);
+    }
     return null;
   }
 }
@@ -155,31 +202,25 @@ export interface CloudflareR2Config {
 }
 
 export function getCloudflareR2Config(): CloudflareR2Config | null {
-  const accountId = (
-    process.env.CLOUDFLARE_ACCOUNT_ID ||
-    process.env.CF_ACCOUNT_ID ||
-    ''
-  ).trim();
+  const accountId = cleanEnv(
+    process.env.CLOUDFLARE_ACCOUNT_ID || process.env.CF_ACCOUNT_ID
+  );
 
-  const apiToken = (
+  const apiToken = cleanEnv(
     process.env.CLOUDFLARE_R2_TOKEN ||
-    process.env.CLOUDFLARE_API_TOKEN ||
-    process.env.CF_API_TOKEN ||
-    ''
-  ).trim();
+      process.env.CLOUDFLARE_API_TOKEN ||
+      process.env.CF_API_TOKEN
+  );
 
-  const bucketName = (
+  const bucketName = cleanEnv(
     process.env.CLOUDFLARE_R2_BUCKET_NAME ||
-    process.env.CLOUDFLARE_R2_BUCKET ||
-    process.env.R2_BUCKET_NAME ||
-    ''
-  ).trim();
+      process.env.CLOUDFLARE_R2_BUCKET ||
+      process.env.R2_BUCKET_NAME
+  );
 
-  const publicUrl = (
-    process.env.CLOUDFLARE_R2_PUBLIC_URL ||
-    process.env.R2_PUBLIC_URL ||
-    ''
-  ).trim().replace(/\/+$/, '');
+  const publicUrl = cleanEnv(
+    process.env.CLOUDFLARE_R2_PUBLIC_URL || process.env.R2_PUBLIC_URL
+  ).replace(/\/+$/, '');
 
   if (accountId && apiToken && bucketName) {
     return {
@@ -208,12 +249,13 @@ export async function uploadToCloudflareR2(
 
   const cleanKey = objectKey.replace(/^\/+/, '');
   const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/r2/buckets/${config.bucketName}/objects/${encodeURIComponent(cleanKey)}`;
+  const authHeaders = getCloudflareAuthHeaders(config.apiToken);
 
   try {
     const response = await fetch(url, {
       method: 'PUT',
       headers: {
-        Authorization: `Bearer ${config.apiToken}`,
+        ...authHeaders,
         'Content-Type': mimeType,
       },
       body: buffer as any,
@@ -224,7 +266,6 @@ export async function uploadToCloudflareR2(
       throw new Error(`Cloudflare R2 upload error (${response.status}): ${errText}`);
     }
 
-    // Якщо налаштовано публічний домен R2 (custom domain або pub-xxx.r2.dev)
     if (config.publicUrl) {
       return {
         success: true,
@@ -233,14 +274,13 @@ export async function uploadToCloudflareR2(
       };
     }
 
-    // Якщо публічний домен не задано — роздаємо через безпечний проксі сервера /api/media/:key
     return {
       success: true,
       url: `/api/media/${cleanKey}`,
       key: cleanKey,
     };
   } catch (err) {
-    console.error('Cloudflare R2 upload exception:', err);
+    console.warn('Cloudflare R2 upload fallback active:', err);
     return null;
   }
 }
@@ -254,13 +294,12 @@ export async function getFromCloudflareR2(
 
   const cleanKey = objectKey.replace(/^\/+/, '');
   const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/r2/buckets/${config.bucketName}/objects/${encodeURIComponent(cleanKey)}`;
+  const authHeaders = getCloudflareAuthHeaders(config.apiToken);
 
   try {
     const response = await fetch(url, {
       method: 'GET',
-      headers: {
-        Authorization: `Bearer ${config.apiToken}`,
-      },
+      headers: authHeaders,
     });
 
     if (!response.ok) {
@@ -275,7 +314,6 @@ export async function getFromCloudflareR2(
       contentType,
     };
   } catch (err) {
-    console.error('Cloudflare R2 fetch error:', err);
     return null;
   }
 }
