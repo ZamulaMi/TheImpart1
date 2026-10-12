@@ -1,5 +1,59 @@
 [
   {
+    "id": "1791811579851",
+    "title": "Test",
+    "excerpt": "",
+    "content": "Content",
+    "category": "Загальне",
+    "categories": [
+      "Загальне"
+    ],
+    "topics": [],
+    "author": "Редакція The Impart",
+    "date": "12 жовтня 2026 р.",
+    "createdAt": "2026-10-12T13:26:19.852Z",
+    "published": true,
+    "categoriesEn": [],
+    "topicsEn": [],
+    "publishedEn": false
+  },
+  {
+    "id": "1791811579356",
+    "title": "Test",
+    "excerpt": "",
+    "content": "Content",
+    "category": "Загальне",
+    "categories": [
+      "Загальне"
+    ],
+    "topics": [],
+    "author": "Редакція The Impart",
+    "date": "12 жовтня 2026 р.",
+    "createdAt": "2026-10-12T13:26:19.356Z",
+    "published": true,
+    "categoriesEn": [],
+    "topicsEn": [],
+    "publishedEn": false
+  },
+  {
+    "id": "1791811410084",
+    "title": "Тестова стаття",
+    "excerpt": "Тест",
+    "content": "<p>Тестовий контент</p>",
+    "category": "Загальне",
+    "categories": [
+      "Загальне"
+    ],
+    "topics": [],
+    "author": "Редакція The Impart",
+    "date": "12 жовтня 2026 р.",
+    "createdAt": "2026-10-12T13:23:30.094Z",
+    "published": true,
+    "categoriesEn": [],
+    "topicsEn": [],
+    "publishedEn": false
+  },
+  {
     "id": "6",
     "title": "Світло як будівельний матеріал: дослідження природної інсоляції",
     "excerpt": "Як природні промені змінюють сприйняття форми, площини та ритму впродовж світлового дня.",

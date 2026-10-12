@@ -643,10 +643,27 @@ export default function App() {
   };
 
   const handleSaveArticle = async (article: Article) => {
-    // 1. Зберігаємо у Cloudflare D1 через API
-    const savedArticle = await saveArticleToCloud(article);
+    let savedArticle = article;
+    try {
+      savedArticle = await saveArticleToCloud(article);
+    } catch (err: any) {
+      console.warn('saveArticleToCloud error, saving locally:', err);
+      setArticles((prev) => {
+        const exists = prev.some((a) => a.id === article.id);
+        const updated = exists
+          ? prev.map((a) => (a.id === article.id ? article : a))
+          : [article, ...prev];
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        } catch (e) {
+          console.error(e);
+        }
+        return updated;
+      });
+      throw err;
+    }
 
-    // 2. Оновлюємо стан статей
+    // Оновлюємо стан статей
     setArticles((prev) => {
       const exists = prev.some((a) => a.id === savedArticle.id);
       const updated = exists

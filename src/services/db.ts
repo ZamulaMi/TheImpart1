@@ -121,17 +121,37 @@ export async function saveArticleToCloud(article: Article): Promise<Article> {
 
   const text = await res.text().catch(() => '');
   let data: any = {};
-  try {
-    data = JSON.parse(text);
-  } catch {
-    data = { error: text };
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      data = { error: text };
+    }
   }
 
   if (res.ok) {
     return (data && typeof data === 'object' && data.id) ? (data as Article) : article;
   }
 
-  throw new Error(formatErrorMessage(data?.error || data, 'Не вдалося зберегти статтю на сервері Cloudflare'));
+  if (res.status === 401) {
+    throw new Error('Сесія адміністратора завершилася. Будь ласка, увійдіть знову в панель керування.');
+  }
+
+  if (res.status === 403) {
+    throw new Error('Недостатньо прав для збереження матеріалу (403).');
+  }
+
+  if (res.status === 413) {
+    throw new Error('Розмір статті занадто великий. Будь ласка, зменшіть розмір фотографій.');
+  }
+
+  const rawError = data?.error || data?.message || text;
+  const errorMsg = formatErrorMessage(
+    rawError,
+    `Не вдалося зберегти матеріал на сервері Cloudflare (HTTP ${res.status}).`
+  );
+
+  throw new Error(errorMsg);
 }
 
 export async function deleteArticleFromCloud(id: string): Promise<boolean> {
