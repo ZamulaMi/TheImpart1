@@ -54,14 +54,19 @@ app.all(['/api/articles', '/api/articles/*'], async (req, res) => {
   try {
     await articlesHandler(req, res);
   } catch (err: any) {
-    console.warn('Express /api/articles fallback active:', err);
+    console.warn('Express /api/articles error:', err);
     if (!res.headersSent) {
-      try {
-        const data = await getArticles();
-        return res.status(200).json(data);
-      } catch {
-        return res.status(200).json([]);
+      if (req.method === 'GET') {
+        try {
+          const data = await getArticles();
+          return res.status(200).json(data);
+        } catch {
+          return res.status(200).json([]);
+        }
       }
+      return res.status(500).json({
+        error: 'Помилка сервера при обробці запиту: ' + (err?.message || 'невідома помилка'),
+      });
     }
   }
 });

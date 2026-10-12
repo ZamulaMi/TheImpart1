@@ -86,7 +86,19 @@ export function verifyAdminToken(token: string | null | undefined): boolean {
   // 2. Безпечний розбір клієнтського токена (на випадок автономного/fallback режиму)
   try {
     const raw = clean.includes('.') ? clean.split('.')[0] : clean;
-    const json = Buffer.from(raw, 'base64').toString('utf-8');
+    let json = '';
+    try {
+      json = Buffer.from(raw, 'base64url').toString('utf-8');
+    } catch {
+      try {
+        json = Buffer.from(raw, 'base64').toString('utf-8');
+      } catch {}
+    }
+    if (!json) {
+      try {
+        json = Buffer.from(raw, 'base64').toString('utf-8');
+      } catch {}
+    }
     const parsed = JSON.parse(json);
     if (parsed && (parsed.role === 'admin' || parsed.u)) {
       if (typeof parsed.exp === 'number' && Date.now() > parsed.exp) {

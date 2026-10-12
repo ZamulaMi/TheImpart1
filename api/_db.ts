@@ -170,18 +170,17 @@ export function getDbClient(): any | null {
 // 4. Безпечне виконання SQL-запиту з тайм-аутом
 export async function safeExecuteSql<T = any>(
   sqlFn: (sql: any) => Promise<T>,
-  timeoutMs: number = 5000
+  timeoutMs: number = 15000
 ): Promise<T | null> {
   const sql = getDbClient();
   if (!sql) return null;
 
+  let timer: any = null;
   try {
-    const result = await Promise.race([
-      sqlFn(sql),
-      new Promise<null>((_, reject) =>
-        setTimeout(() => reject(new Error('Cloudflare D1 SQL timeout')), timeoutMs)
-      ),
-    ]);
+    const timeoutPromise = new Promise<null>((_, reject) => {
+      timer = setTimeout(() => reject(new Error('Cloudflare D1 SQL timeout')), timeoutMs);
+    });
+    const result = await Promise.race([sqlFn(sql), timeoutPromise]);
     return result;
   } catch (err: any) {
     if (err?.message?.includes('401') || err?.message?.includes('Authentication error')) {
@@ -190,6 +189,8 @@ export async function safeExecuteSql<T = any>(
       console.warn('Cloudflare D1 query notice:', err?.message || err);
     }
     return null;
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }
 

@@ -280,8 +280,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingArticle || !editingArticle.title?.trim()) {
-      alert('Будь ласка, вкажіть заголовок статті для основної (української) версії.');
+    const titleUa = editingArticle?.title?.trim() || '';
+    const titleEn = editingArticle?.titleEn?.trim() || '';
+
+    if (!editingArticle || (!titleUa && !titleEn)) {
+      setErrorMsg('Будь ласка, вкажіть заголовок статті (українською або англійською мовою).');
       return;
     }
 
@@ -292,10 +295,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const isPubEn =
       editingArticle.publishedEn === true || String(editingArticle.publishedEn) === 'true';
 
+    const finalTitle = titleUa || titleEn;
+
     const finalArticle: Article = {
       id: editingArticle.id || Date.now().toString(),
       // Українська версія
-      title: editingArticle.title.trim(),
+      title: finalTitle,
       excerpt: editingArticle.excerpt?.trim() || '',
       content: editingArticle.content?.trim() || '',
       category:

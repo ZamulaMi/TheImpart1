@@ -1,5 +1,59 @@
 [
   {
+    "id": "1791814725086",
+    "title": "Test from client token",
+    "excerpt": "",
+    "content": "",
+    "category": "Загальне",
+    "categories": [
+      "Загальне"
+    ],
+    "topics": [],
+    "author": "Редакція The Impart",
+    "date": "12 жовтня 2026 р.",
+    "createdAt": "2026-10-12T14:18:45.086Z",
+    "published": true,
+    "categoriesEn": [],
+    "topicsEn": [],
+    "publishedEn": false
+  },
+  {
+    "id": "1791814542641",
+    "title": "Test Article from HTTP",
+    "excerpt": "",
+    "content": "Content here",
+    "category": "Новини",
+    "categories": [
+      "Новини"
+    ],
+    "topics": [],
+    "author": "Редакція The Impart",
+    "date": "12 жовтня 2026 р.",
+    "createdAt": "2026-10-12T14:15:42.651Z",
+    "published": true,
+    "categoriesEn": [],
+    "topicsEn": [],
+    "publishedEn": false
+  },
+  {
+    "id": "test_123",
+    "title": "Тест",
+    "excerpt": "",
+    "content": "Тестовий контент",
+    "category": "Загальне",
+    "categories": [
+      "Загальне"
+    ],
+    "topics": [],
+    "author": "Редакція The Impart",
+    "date": "12 жовтня 2026 р.",
+    "createdAt": "2026-10-12T14:15:17.393Z",
+    "published": true,
+    "categoriesEn": [],
+    "topicsEn": [],
+    "publishedEn": false
+  },
+  {
     "id": "1791811579851",
     "title": "Test",
     "excerpt": "",

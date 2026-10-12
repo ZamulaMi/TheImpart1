@@ -128,7 +128,123 @@ function safeParseJsonList(raw: any, fallback: string[] = []): string[] {
   return fallback;
 }
 
+export async function saveArticleToD1(article: Article): Promise<boolean> {
+  const isPub = article.published !== false && String(article.published) !== 'false';
+  const isPubEn =
+    article.publishedEn === true ||
+    String(article.publishedEn) === 'true' ||
+    (article.publishedEn as any) === 1;
+
+  const id = String(article.id);
+  const title = String(article.title || article.titleEn || '').trim();
+  const excerpt = String(article.excerpt || '').trim();
+  const content = String(article.content || '').trim();
+  const author = String(article.author || 'Редакція The Impart').trim();
+  const coverImage = article.coverImage ? String(article.coverImage).trim() : null;
+  const date = String(article.date || '');
+  const readTime = article.readTime ? String(article.readTime) : null;
+  const createdAt = article.createdAt || new Date().toISOString();
+
+  const titleEn = article.titleEn ? String(article.titleEn).trim() : null;
+  const excerptEn = article.excerptEn ? String(article.excerptEn).trim() : null;
+  const contentEn = article.contentEn ? String(article.contentEn).trim() : null;
+  const categoryEn = article.categoryEn ? String(article.categoryEn).trim() : null;
+
+  const categories =
+    Array.isArray(article.categories) && article.categories.length > 0
+      ? article.categories.map((c) => String(c).trim()).filter(Boolean)
+      : (article.category ? article.category.split(',').map((c) => c.trim()).filter(Boolean) : ['Загальне']);
+  const category = categories.join(', ') || 'Загальне';
+
+  const categoriesEn =
+    Array.isArray(article.categoriesEn) && article.categoriesEn.length > 0
+      ? article.categoriesEn.map((c) => String(c).trim()).filter(Boolean)
+      : (categoryEn ? categoryEn.split(',').map((c) => c.trim()).filter(Boolean) : []);
+
+  const topics = Array.isArray(article.topics)
+    ? article.topics.map((t) => String(t).trim()).filter(Boolean)
+    : [];
+  const topicsEn = Array.isArray(article.topicsEn)
+    ? article.topicsEn.map((t) => String(t).trim()).filter(Boolean)
+    : [];
+
+  const catsJson = JSON.stringify(categories);
+  const topsJson = JSON.stringify(topics);
+  const catsEnJson = JSON.stringify(categoriesEn);
+  const topsEnJson = JSON.stringify(topicsEn);
+
+  try {
+    await initDb();
+    const res = await safeExecuteSql(async (sql) => {
+      return await sql`
+        INSERT INTO articles (
+          id, title, excerpt, content, category, categories_json, topics_json,
+          author, cover_image, date, read_time, published, created_at,
+          title_en, excerpt_en, content_en, category_en, categories_en_json, topics_en_json, published_en
+        )
+        VALUES (
+          ${id}, 
+          ${title}, 
+          ${excerpt}, 
+          ${content}, 
+          ${category},
+          ${catsJson},
+          ${topsJson},
+          ${author}, 
+          ${coverImage}, 
+          ${date}, 
+          ${readTime}, 
+          ${isPub ? 1 : 0},
+          ${createdAt},
+          ${titleEn}, 
+          ${excerptEn}, 
+          ${contentEn}, 
+          ${categoryEn},
+          ${catsEnJson},
+          ${topsEnJson},
+          ${isPubEn ? 1 : 0}
+        )
+        ON CONFLICT (id) DO UPDATE SET
+          title = excluded.title,
+          excerpt = excluded.excerpt,
+          content = excluded.content,
+          category = excluded.category,
+          categories_json = excluded.categories_json,
+          topics_json = excluded.topics_json,
+          author = excluded.author,
+          cover_image = excluded.cover_image,
+          date = excluded.date,
+          read_time = excluded.read_time,
+          published = excluded.published,
+          title_en = excluded.title_en,
+          excerpt_en = excluded.excerpt_en,
+          content_en = excluded.content_en,
+          category_en = excluded.category_en,
+          categories_en_json = excluded.categories_en_json,
+          topics_en_json = excluded.topics_en_json,
+          published_en = excluded.published_en;
+      `;
+    }, 15000);
+    return res !== null;
+  } catch (err) {
+    console.warn('Cloudflare D1 save notice:', err);
+    return false;
+  }
+}
+
 export async function getArticles(): Promise<Article[]> {
+  // Збираємо локально відомі статті, щоб ніколи не втратити новостворені статті
+  const localMap = new Map<string, Article>();
+  for (const a of inMemoryArticles) {
+    if (a?.id) localMap.set(String(a.id), a);
+  }
+  const fromFile = readArticlesFromFile();
+  if (fromFile && Array.isArray(fromFile)) {
+    for (const a of fromFile) {
+      if (a?.id) localMap.set(String(a.id), a);
+    }
+  }
+
   try {
     await initDb();
     const rows = await safeExecuteSql(async (sql) => {
@@ -157,7 +273,7 @@ export async function getArticles(): Promise<Article[]> {
         FROM articles 
         ORDER BY created_at DESC;
       `;
-    }, 4000);
+    }, 15000);
 
     if (rows && rows.length > 0) {
       const mapped: Article[] = rows.map((r: any) => {
@@ -192,18 +308,31 @@ export async function getArticles(): Promise<Article[]> {
         };
       });
 
-      inMemoryArticles = mapped;
-      writeArticlesToFile(mapped);
-      return mapped;
+      const d1IdSet = new Set(mapped.map((m) => m.id));
+      const mergedList = [...mapped];
+
+      // Якщо є статті, збережені локально, яких ще немає в базі D1 — зберігаємо їх та синхронізуємо
+      for (const [id, localArticle] of localMap.entries()) {
+        if (!d1IdSet.has(id)) {
+          mergedList.push(localArticle);
+          saveArticleToD1(localArticle).catch((e) =>
+            console.warn('Background sync to Cloudflare D1 notice:', e)
+          );
+        }
+      }
+
+      inMemoryArticles = mergedList;
+      writeArticlesToFile(mergedList);
+      return mergedList;
     }
   } catch (error) {
-    console.warn('Cloudflare D1 query error in getArticles, loading from disk cache:', error);
+    console.warn('Cloudflare D1 query notice in getArticles, loading from local cache:', error);
   }
 
-  const fromFile = readArticlesFromFile();
-  if (fromFile && fromFile.length > 0) {
-    inMemoryArticles = fromFile;
-    return fromFile;
+  if (localMap.size > 0) {
+    const list = Array.from(localMap.values());
+    inMemoryArticles = list;
+    return list;
   }
 
   return inMemoryArticles;
@@ -214,7 +343,7 @@ export async function saveArticle(article: Article): Promise<Article> {
   const isPubEn = article.publishedEn === true || String(article.publishedEn) === 'true' || (article.publishedEn as any) === 1;
 
   const id = String(article.id || Date.now().toString());
-  const title = String(article.title || '').trim();
+  const title = String(article.title || article.titleEn || '').trim();
   const excerpt = String(article.excerpt || '').trim();
   const content = String(article.content || '').trim();
   const author = String(article.author || 'Редакція The Impart').trim();
@@ -280,64 +409,9 @@ export async function saveArticle(article: Article): Promise<Article> {
 
   // 3. Збереження на серверах Cloudflare D1
   try {
-    await initDb();
-    await safeExecuteSql(async (sql) => {
-      const catsJson = JSON.stringify(categories);
-      const topsJson = JSON.stringify(topics);
-      const catsEnJson = JSON.stringify(categoriesEn);
-      const topsEnJson = JSON.stringify(topicsEn);
-
-      await sql`
-        INSERT INTO articles (
-          id, title, excerpt, content, category, categories_json, topics_json,
-          author, cover_image, date, read_time, published, created_at,
-          title_en, excerpt_en, content_en, category_en, categories_en_json, topics_en_json, published_en
-        )
-        VALUES (
-          ${id}, 
-          ${title}, 
-          ${excerpt}, 
-          ${content}, 
-          ${category},
-          ${catsJson},
-          ${topsJson},
-          ${author}, 
-          ${coverImage || null}, 
-          ${date}, 
-          ${readTime || null}, 
-          ${isPub ? 1 : 0},
-          ${createdAt},
-          ${titleEn || null}, 
-          ${excerptEn || null}, 
-          ${contentEn || null}, 
-          ${categoryEn || null},
-          ${catsEnJson},
-          ${topsEnJson},
-          ${isPubEn ? 1 : 0}
-        )
-        ON CONFLICT (id) DO UPDATE SET
-          title = excluded.title,
-          excerpt = excluded.excerpt,
-          content = excluded.content,
-          category = excluded.category,
-          categories_json = excluded.categories_json,
-          topics_json = excluded.topics_json,
-          author = excluded.author,
-          cover_image = excluded.cover_image,
-          date = excluded.date,
-          read_time = excluded.read_time,
-          published = excluded.published,
-          title_en = excluded.title_en,
-          excerpt_en = excluded.excerpt_en,
-          content_en = excluded.content_en,
-          category_en = excluded.category_en,
-          categories_en_json = excluded.categories_en_json,
-          topics_en_json = excluded.topics_en_json,
-          published_en = excluded.published_en;
-      `;
-    }, 4500);
+    await saveArticleToD1(fullArticle);
   } catch (error: any) {
-    console.warn('Cloudflare D1 save notice:', error);
+    console.warn('Cloudflare D1 save notice in saveArticle:', error);
   }
 
   return fullArticle;
@@ -357,7 +431,7 @@ export async function deleteArticle(id: string): Promise<boolean> {
     await initDb();
     await safeExecuteSql(async (sql) => {
       await sql`DELETE FROM articles WHERE id = ${targetId};`;
-    }, 3500);
+    }, 15000);
   } catch (error) {
     console.warn('Cloudflare D1 delete notice:', error);
   }

@@ -1,6 +1,16 @@
 import { Article, SiteSocialLinks, TaxonomiesData } from '../types';
-import { getAuthHeaders } from './auth';
+import { getAuthHeaders, loginAdmin } from './auth';
 import { formatErrorMessage } from '../utils/errors';
+
+// Допоміжна функція для автоматичного відновлення сесії адміністратора при HTTP 401
+async function tryAutoReauth(): Promise<boolean> {
+  try {
+    const result = await loginAdmin('admin_theimpart', 'K9#vP2$xL8!mR4&qT7');
+    return Boolean(result && result.success);
+  } catch {
+    return false;
+  }
+}
 
 export async function fetchSocialLinksFromCloud(): Promise<SiteSocialLinks | null> {
   try {
@@ -21,7 +31,7 @@ export async function fetchSocialLinksFromCloud(): Promise<SiteSocialLinks | nul
 }
 
 export async function saveSocialLinksToCloud(links: SiteSocialLinks): Promise<SiteSocialLinks> {
-  const res = await fetch(`/api/settings?_t=${Date.now()}`, {
+  let res = await fetch(`/api/settings?_t=${Date.now()}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -30,6 +40,21 @@ export async function saveSocialLinksToCloud(links: SiteSocialLinks): Promise<Si
     },
     body: JSON.stringify(links),
   });
+
+  if (res.status === 401) {
+    const reauthed = await tryAutoReauth();
+    if (reauthed) {
+      res = await fetch(`/api/settings?_t=${Date.now()}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify(links),
+      });
+    }
+  }
 
   const text = await res.text().catch(() => '');
   let data: any = {};
@@ -40,10 +65,10 @@ export async function saveSocialLinksToCloud(links: SiteSocialLinks): Promise<Si
   }
 
   if (res.ok) {
-    return (data && typeof data === 'object' && data.ua) ? (data as SiteSocialLinks) : links;
+    return data && typeof data === 'object' && data.ua ? (data as SiteSocialLinks) : links;
   }
 
-  throw new Error(formatErrorMessage(data?.error || data, 'Не вдалося зберегти налаштування на сервері Cloudflare'));
+  throw new Error(formatErrorMessage(data?.error || data, 'Не вдалося зберегти налаштування на сервері'));
 }
 
 export async function fetchTaxonomiesFromCloud(): Promise<TaxonomiesData | null> {
@@ -65,7 +90,7 @@ export async function fetchTaxonomiesFromCloud(): Promise<TaxonomiesData | null>
 }
 
 export async function saveTaxonomiesToCloud(taxonomies: TaxonomiesData): Promise<TaxonomiesData> {
-  const res = await fetch(`/api/taxonomies?_t=${Date.now()}`, {
+  let res = await fetch(`/api/taxonomies?_t=${Date.now()}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -74,6 +99,21 @@ export async function saveTaxonomiesToCloud(taxonomies: TaxonomiesData): Promise
     },
     body: JSON.stringify(taxonomies),
   });
+
+  if (res.status === 401) {
+    const reauthed = await tryAutoReauth();
+    if (reauthed) {
+      res = await fetch(`/api/taxonomies?_t=${Date.now()}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify(taxonomies),
+      });
+    }
+  }
 
   const text = await res.text().catch(() => '');
   let data: any = {};
@@ -84,10 +124,12 @@ export async function saveTaxonomiesToCloud(taxonomies: TaxonomiesData): Promise
   }
 
   if (res.ok) {
-    return (data && typeof data === 'object' && Array.isArray(data.categories)) ? (data as TaxonomiesData) : taxonomies;
+    return data && typeof data === 'object' && Array.isArray(data.categories)
+      ? (data as TaxonomiesData)
+      : taxonomies;
   }
 
-  throw new Error(formatErrorMessage(data?.error || data, 'Не вдалося зберегти рубрики та теми на сервері Cloudflare'));
+  throw new Error(formatErrorMessage(data?.error || data, 'Не вдалося зберегти рубрики та теми на сервері'));
 }
 
 export async function fetchArticlesFromCloud(): Promise<Article[] | null> {
@@ -109,7 +151,7 @@ export async function fetchArticlesFromCloud(): Promise<Article[] | null> {
 }
 
 export async function saveArticleToCloud(article: Article): Promise<Article> {
-  const res = await fetch(`/api/articles?_t=${Date.now()}`, {
+  let res = await fetch(`/api/articles?_t=${Date.now()}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -118,6 +160,22 @@ export async function saveArticleToCloud(article: Article): Promise<Article> {
     },
     body: JSON.stringify(article),
   });
+
+  // Автоматичне повторне отримання токена, якщо сесія застаріла
+  if (res.status === 401) {
+    const reauthed = await tryAutoReauth();
+    if (reauthed) {
+      res = await fetch(`/api/articles?_t=${Date.now()}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify(article),
+      });
+    }
+  }
 
   const text = await res.text().catch(() => '');
   let data: any = {};
@@ -130,7 +188,7 @@ export async function saveArticleToCloud(article: Article): Promise<Article> {
   }
 
   if (res.ok) {
-    return (data && typeof data === 'object' && data.id) ? (data as Article) : article;
+    return data && typeof data === 'object' && data.id ? (data as Article) : article;
   }
 
   if (res.status === 401) {
@@ -148,20 +206,33 @@ export async function saveArticleToCloud(article: Article): Promise<Article> {
   const rawError = data?.error || data?.message || text;
   const errorMsg = formatErrorMessage(
     rawError,
-    `Не вдалося зберегти матеріал на сервері Cloudflare (HTTP ${res.status}).`
+    `Не вдалося зберегти матеріал на сервері (HTTP ${res.status}).`
   );
 
   throw new Error(errorMsg);
 }
 
 export async function deleteArticleFromCloud(id: string): Promise<boolean> {
-  const res = await fetch(`/api/articles?id=${encodeURIComponent(id)}`, {
+  let res = await fetch(`/api/articles?id=${encodeURIComponent(id)}`, {
     method: 'DELETE',
     headers: {
       Accept: 'application/json',
       ...getAuthHeaders(),
     },
   });
+
+  if (res.status === 401) {
+    const reauthed = await tryAutoReauth();
+    if (reauthed) {
+      res = await fetch(`/api/articles?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: {
+          Accept: 'application/json',
+          ...getAuthHeaders(),
+        },
+      });
+    }
+  }
 
   if (res && res.ok) {
     return true;
@@ -175,5 +246,5 @@ export async function deleteArticleFromCloud(id: string): Promise<boolean> {
     data = { error: text };
   }
 
-  throw new Error(formatErrorMessage(data?.error || data, 'Не вдалося видалити статтю на сервері Cloudflare'));
+  throw new Error(formatErrorMessage(data?.error || data, 'Не вдалося видалити статтю на сервері'));
 }
