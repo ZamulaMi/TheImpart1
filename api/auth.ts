@@ -83,7 +83,7 @@ function readCustomCredentialsFromFile(): CustomCredentials | null {
 function writeCustomCredentialsToFile(creds: CustomCredentials | null): void {
   const payload = creds ? JSON.stringify(creds, null, 2) : '';
   
-  // У Vercel Serverless завжди безпечно пишемо в /tmp
+  // Резервно пишемо в /tmp
   try {
     if (creds) {
       fs.writeFileSync(TMP_ADMIN_FILE, payload, 'utf-8');
@@ -109,14 +109,14 @@ function writeCustomCredentialsToFile(creds: CustomCredentials | null): void {
 export async function ensureCredentialsLoaded(): Promise<void> {
   if (isCredentialsLoaded && inMemoryCustomCredentials) return;
 
-  // 1. Спроба завантажити з PostgreSQL з безпечним тайм-аутом
+  // 1. Спроба завантажити з хмарної бази даних з безпечним тайм-аутом
   try {
     const rows = await safeExecuteSql(async (sql) => {
       await sql`
         CREATE TABLE IF NOT EXISTS site_settings (
           key VARCHAR(100) PRIMARY KEY,
           value TEXT NOT NULL,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
       `;
       const settingsKey = 'admin_credentials';
@@ -133,7 +133,7 @@ export async function ensureCredentialsLoaded(): Promise<void> {
       }
     }
   } catch (err) {
-    console.warn('Could not read admin_credentials from PostgreSQL (fallback active):', err);
+    console.warn('Could not read admin_credentials from Cloudflare/Database (fallback active):', err);
   }
 
   // 2. Читання з локального файлу (/tmp або data/admin.json)
@@ -193,14 +193,14 @@ export async function saveNewCredentials(
   // 2. Зберігаємо у файл (/tmp та локальний диск)
   writeCustomCredentialsToFile(creds);
 
-  // 3. Зберігаємо у PostgreSQL з тайм-аутом (ізоляція від падіння сервісу)
+  // 3. Зберігаємо у хмарній базі даних з тайм-аутом (ізоляція від падіння сервісу)
   try {
     await safeExecuteSql(async (sql) => {
       await sql`
         CREATE TABLE IF NOT EXISTS site_settings (
           key VARCHAR(100) PRIMARY KEY,
           value TEXT NOT NULL,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
       `;
       const settingsKey = 'admin_credentials';
@@ -208,11 +208,11 @@ export async function saveNewCredentials(
       await sql`
         INSERT INTO site_settings (key, value, updated_at)
         VALUES (${settingsKey}, ${credsJson}, CURRENT_TIMESTAMP)
-        ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = CURRENT_TIMESTAMP;
+        ON CONFLICT (key) DO UPDATE SET value = excluded.value, updated_at = CURRENT_TIMESTAMP;
       `;
     }, 3000);
   } catch (err) {
-    console.warn('Could not persist admin_credentials to PostgreSQL:', err);
+    console.warn('Could not persist admin_credentials to Cloudflare/Database:', err);
   }
 
   return creds;
@@ -230,7 +230,7 @@ export async function resetCredentialsToDefault(): Promise<void> {
       await sql`DELETE FROM site_settings WHERE key = ${settingsKey};`;
     }, 2500);
   } catch (err) {
-    console.warn('Could not reset admin_credentials in PostgreSQL:', err);
+    console.warn('Could not reset admin_credentials in Cloudflare/Database:', err);
   }
 }
 
@@ -290,7 +290,7 @@ function resetAttempts(ip: string): void {
   loginAttempts.delete(ip);
 }
 
-// Ендпоінт входу / перевірки (сумісний як з Express, так і з Vercel Serverless)
+// Ендпоінт входу / перевірки (сумісний з Express)
 export default async function authHandler(req: any, res: any) {
   initResponseHelpers(res);
 

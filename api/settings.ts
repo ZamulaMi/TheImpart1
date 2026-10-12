@@ -61,7 +61,7 @@ function readSettingsFromFile(): SiteSocialLinks | null {
 function writeSettingsToFile(data: SiteSocialLinks): void {
   const payload = JSON.stringify(data, null, 2);
 
-  // Vercel Serverless: запис у /tmp
+  // Резервний запис у /tmp
   try {
     fs.writeFileSync(TMP_SETTINGS_FILE, payload, 'utf-8');
   } catch {}
@@ -89,7 +89,7 @@ async function initSettingsDb() {
         CREATE TABLE IF NOT EXISTS site_settings (
           key VARCHAR(100) PRIMARY KEY,
           value TEXT NOT NULL,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
       `;
 
@@ -109,7 +109,7 @@ async function initSettingsDb() {
 }
 
 export async function getSocialLinks(): Promise<SiteSocialLinks> {
-  // 1. Спроба завантажити з PostgreSQL з безпечним тайм-аутом
+  // 1. Спроба завантажити з хмарної бази даних з безпечним тайм-аутом
   try {
     await initSettingsDb();
     const rows = await safeExecuteSql(async (sql) => {
@@ -170,7 +170,7 @@ export async function saveSocialLinks(links: any): Promise<SiteSocialLinks> {
   // 2. Зберігаємо у файл
   writeSettingsToFile(cleaned);
 
-  // 3. Синхронізація з PostgreSQL з тайм-аутом
+  // 3. Синхронізація з хмарною базою даних з тайм-аутом
   try {
     await initSettingsDb();
     await safeExecuteSql(async (sql) => {
@@ -183,7 +183,7 @@ export async function saveSocialLinks(links: any): Promise<SiteSocialLinks> {
       `;
     }, 3000);
   } catch (err) {
-    console.warn('Postgres sync notice: settings saved locally:', err);
+    console.warn('Cloudflare/Database sync notice: settings saved locally:', err);
   }
 
   return cleaned;

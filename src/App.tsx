@@ -399,7 +399,7 @@ export default function App() {
   };
 
   const fetchSocialLinksFromDb = async () => {
-    // 1. Пряме завантаження з хмарної бази даних Neon (гарантовано працює у ВСІХ браузерах без проксі)
+    // 1. Пряме завантаження з хмарної бази даних (Cloudflare D1 / API)
     try {
       const cloudLinks = await fetchSocialLinksFromCloud();
       if (cloudLinks && typeof cloudLinks === 'object') {
@@ -412,7 +412,7 @@ export default function App() {
         return;
       }
     } catch (e) {
-      console.warn('Neon direct fetch notice:', e);
+      console.warn('Cloud database direct fetch notice:', e);
     }
 
     // 2. Резервне завантаження через /api/settings
@@ -440,7 +440,7 @@ export default function App() {
   const handleSaveSocialLinks = async (links: SiteSocialLinks) => {
     let savedSuccessfully = false;
 
-    // 1. Зберігаємо безпосередньо у хмарній базі даних Neon (обходить будь-які блокування проксі)
+    // 1. Зберігаємо у хмарній базі даних через API
     try {
       await saveSocialLinksToCloud(links);
       savedSuccessfully = true;
@@ -489,7 +489,7 @@ export default function App() {
   const fetchArticlesFromDb = async () => {
     let loaded = false;
 
-    // 1. Пряме завантаження статей із хмарної бази Neon
+    // 1. Пряме завантаження статей із хмарної бази даних
     try {
       const cloudArticles = await fetchArticlesFromCloud();
       const sanitized = sanitizeArticleList(cloudArticles);
@@ -505,7 +505,7 @@ export default function App() {
         return;
       }
     } catch (e) {
-      console.warn('Neon direct articles fetch notice:', e);
+      console.warn('Cloud articles direct fetch notice:', e);
     }
 
     // 2. Резервне завантаження через /api/articles
@@ -700,11 +700,11 @@ export default function App() {
   const handleSaveArticle = async (article: Article) => {
     let savedArticle = article;
 
-    // 1. Зберігаємо у хмарну базу даних Neon безпосередньо (доступно для всіх браузерів)
+    // 1. Зберігаємо у хмарну базу даних через API
     try {
       savedArticle = await saveArticleToCloud(article);
     } catch (err) {
-      console.warn('Direct Neon cloud save notice, trying server endpoint:', err);
+      console.warn('Direct cloud save notice, trying server endpoint:', err);
     }
 
     // 2. Резервний фоновий бекап на сервер

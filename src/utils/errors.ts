@@ -30,7 +30,7 @@ export function formatErrorMessage(err: unknown, fallback: string = 'Стала�
       return rec.error.trim();
     }
 
-    // 3. Якщо це відповідь платформи Vercel або Google: { error: { code, message } }
+    // 3. Якщо це відповідь бекенд-сервера або API: { error: { code, message } }
     if (rec.error && typeof rec.error === 'object') {
       const nested = rec.error;
       if (typeof nested.message === 'string' && nested.message.trim()) {

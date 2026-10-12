@@ -4,9 +4,9 @@ import { fileURLToPath } from 'url';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
-import articlesHandler, { getArticles } from './api/articles';
-import settingsHandler, { getSocialLinks } from './api/settings';
-import authHandler, { extractToken, verifyAdminToken } from './api/auth';
+import articlesHandler, { getArticles } from './api/articles.ts';
+import settingsHandler, { getSocialLinks } from './api/settings.ts';
+import authHandler, { extractToken, verifyAdminToken } from './api/auth.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

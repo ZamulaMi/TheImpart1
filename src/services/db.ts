@@ -55,7 +55,7 @@ export async function saveSocialLinksToCloud(links: SiteSocialLinks): Promise<Si
     }
   }
 
-  // Якщо сервер Vercel тимчасово недоступний, повертаємо передані налаштування
+  // Якщо сервер тимчасово недоступний, повертаємо передані налаштування
   return links;
 }
 
@@ -112,7 +112,7 @@ export async function saveArticleToCloud(article: Article): Promise<Article> {
     }
   }
 
-  // Якщо серверний маршрут Vercel тимчасово недоступний, повертаємо статтю (збережеться у локальний кеш)
+  // Якщо серверний маршрут тимчасово недоступний, повертаємо статтю (збережеться у локальний кеш)
   return article;
 }
 

@@ -1,5 +1,5 @@
 /**
- * Допоміжні функції для серверних обробників API Vercel Serverless та Express.
+ * Допоміжні функції для серверних обробників API та Express.
  */
 
 export function initResponseHelpers(res: any): void {

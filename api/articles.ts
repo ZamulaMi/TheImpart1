@@ -62,7 +62,7 @@ function readArticlesFromFile(): Article[] | null {
 function writeArticlesToFile(articles: Article[]): void {
   const payload = JSON.stringify(articles, null, 2);
 
-  // Vercel Serverless: безпечний запис у /tmp
+  // Тимчасовий резервний запис у /tmp
   try {
     fs.writeFileSync(ARTICLES_TMP_FILE, payload, 'utf-8');
   } catch {}
@@ -102,15 +102,14 @@ export async function initDb() {
           date VARCHAR(100),
           read_time VARCHAR(100),
           published BOOLEAN DEFAULT true,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          title_en TEXT,
+          excerpt_en TEXT,
+          content_en TEXT,
+          category_en VARCHAR(100),
+          published_en BOOLEAN DEFAULT false
         );
       `;
-
-      await sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS title_en TEXT;`;
-      await sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS excerpt_en TEXT;`;
-      await sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS content_en TEXT;`;
-      await sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS category_en VARCHAR(100);`;
-      await sql`ALTER TABLE articles ADD COLUMN IF NOT EXISTS published_en BOOLEAN DEFAULT false;`;
 
       const rows = await sql`SELECT count(*) as count FROM articles;`;
       if (parseInt(rows[0]?.count || '0', 10) === 0) {
@@ -146,7 +145,7 @@ export async function initDb() {
 
     isTableInitialized = true;
   } catch (error) {
-    console.warn('Neon initDb notice (fallback active):', error);
+    console.warn('Cloudflare/Database initDb notice (fallback active):', error);
   }
 }
 
@@ -202,7 +201,7 @@ export async function getArticles(): Promise<Article[]> {
       return mapped;
     }
   } catch (error) {
-    console.warn('Neon query error in getArticles, loading from disk/memory:', error);
+    console.warn('Cloudflare/Database query error in getArticles, loading from disk/memory:', error);
   }
 
   const fromFile = readArticlesFromFile();
@@ -281,7 +280,7 @@ export async function saveArticle(article: Article): Promise<Article> {
   // 2. Миттєво записуємо у файл
   writeArticlesToFile(inMemoryArticles);
 
-  // 3. Синхронізуємо з Neon PostgreSQL з безпечним тайм-аутом
+  // 3. Синхронізуємо з хмарною базою даних (Cloudflare D1 / Hyperdrive) з безпечним тайм-аутом
   try {
     await initDb();
     await safeExecuteSql(async (sql) => {
@@ -308,24 +307,24 @@ export async function saveArticle(article: Article): Promise<Article> {
           ${isPubEn}
         )
         ON CONFLICT (id) DO UPDATE SET
-          title = EXCLUDED.title,
-          excerpt = EXCLUDED.excerpt,
-          content = EXCLUDED.content,
-          category = EXCLUDED.category,
-          author = EXCLUDED.author,
-          cover_image = EXCLUDED.cover_image,
-          date = EXCLUDED.date,
-          read_time = EXCLUDED.read_time,
-          published = EXCLUDED.published,
-          title_en = EXCLUDED.title_en,
-          excerpt_en = EXCLUDED.excerpt_en,
-          content_en = EXCLUDED.content_en,
-          category_en = EXCLUDED.category_en,
-          published_en = EXCLUDED.published_en;
+          title = excluded.title,
+          excerpt = excluded.excerpt,
+          content = excluded.content,
+          category = excluded.category,
+          author = excluded.author,
+          cover_image = excluded.cover_image,
+          date = excluded.date,
+          read_time = excluded.read_time,
+          published = excluded.published,
+          title_en = excluded.title_en,
+          excerpt_en = excluded.excerpt_en,
+          content_en = excluded.content_en,
+          category_en = excluded.category_en,
+          published_en = excluded.published_en;
       `;
     }, 3500);
   } catch (error: any) {
-    console.warn('Neon save notice (article is saved locally):', error);
+    console.warn('Cloudflare save notice (article is saved locally):', error);
   }
 
   return fullArticle;
@@ -340,14 +339,14 @@ export async function deleteArticle(id: string): Promise<boolean> {
   // 2. Оновлюємо файл на диску
   writeArticlesToFile(inMemoryArticles);
 
-  // 3. Синхронізуємо видалення з Neon
+  // 3. Синхронізуємо видалення з хмарної бази даних
   try {
     await initDb();
     await safeExecuteSql(async (sql) => {
       await sql`DELETE FROM articles WHERE id = ${targetId};`;
     }, 2500);
   } catch (error) {
-    console.warn('Neon delete notice:', error);
+    console.warn('Cloudflare delete notice:', error);
   }
 
   return true;

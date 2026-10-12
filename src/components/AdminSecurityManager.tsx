@@ -211,7 +211,7 @@ export const AdminSecurityManager: React.FC<AdminSecurityManagerProps> = ({
         </h1>
         <p className="text-xs sm:text-sm text-neutral-500 mt-1">
           Керуйте обліковими даними редакційної панелі. Нові дані шифруються за стандартом HMAC-SHA256
-          та надійно зберігаються у базі даних (Neon PostgreSQL) та на сервері.
+          та надійно зберігаються у хмарній базі даних (Cloudflare D1 / SQL) та на сервері.
         </p>
       </div>
 
@@ -245,7 +245,7 @@ export const AdminSecurityManager: React.FC<AdminSecurityManagerProps> = ({
           <div>Шифрування: HMAC-SHA256</div>
           <div className="text-emerald-600 font-medium flex items-center sm:justify-end gap-1 mt-0.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
-            Сховище: Хмара PostgreSQL
+            Сховище: Хмара Cloudflare D1 / SQL
           </div>
         </div>
       </div>
@@ -460,7 +460,7 @@ export const AdminSecurityManager: React.FC<AdminSecurityManagerProps> = ({
             </h3>
             <p className="text-xs text-neutral-500 mt-1 max-w-lg">
               Якщо ви бажаєте відмовитися від власних налаштувань та повернути логін і пароль за замовчуванням
-              (змінні середовища Vercel або стандартний логін).
+              (змінні середовища сервера або стандартний логін).
             </p>
           </div>
 
@@ -535,7 +535,7 @@ export const AdminSecurityManager: React.FC<AdminSecurityManagerProps> = ({
           <p className="font-semibold">Рекомендація щодо збереження пароля:</p>
           <p className="text-amber-800/90 leading-relaxed">
             Після зміни обов'язково збережіть нові дані у надійному менеджері паролів (наприклад, 1Password, Bitwarden або Apple Keychain).
-            Якщо ви забудете власний пароль, відновлення можливе через скидання змінних у Vercel Dashboard або через прямий доступ до PostgreSQL.
+            Якщо ви забудете власний пароль, відновлення можливе через скидання змінних у налаштуваннях сервера або через панель керування Cloudflare / прямий доступ до бази даних.
           </p>
         </div>
       </div>
