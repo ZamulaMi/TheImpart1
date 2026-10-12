@@ -1,5 +1,23 @@
 [
   {
+    "id": "1791817580945",
+    "title": "Тестова стаття без додаткових налаштувань",
+    "excerpt": "",
+    "content": "Контент успішно збережено на сервері!",
+    "category": "Новини",
+    "categories": [
+      "Новини"
+    ],
+    "topics": [],
+    "author": "Редакція The Impart",
+    "date": "12 жовтня 2026 р.",
+    "createdAt": "2026-10-12T15:06:20.953Z",
+    "published": true,
+    "categoriesEn": [],
+    "topicsEn": [],
+    "publishedEn": false
+  },
+  {
     "id": "1791814725086",
     "title": "Test from client token",
     "excerpt": "",

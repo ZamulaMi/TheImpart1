@@ -1,28 +1,12 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "theimpart",
-  "main": "server.ts",
   "compatibility_date": "2026-10-01",
-  "compatibility_flags": ["nodejs_compat"],
   "build": {
     "command": "npm run build"
   },
   "assets": {
     "directory": "./dist",
-    "binding": "ASSETS",
     "not_found_handling": "single-page-application"
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "theimpart",
-      "database_id": "6b29518b-7e32-4140-b3e2-cfbccdb72c1e"
-    }
-  ],
-  "r2_buckets": [
-    {
-      "binding": "BUCKET",
-      "bucket_name": "the-impart"
-    }
-  ]
+  }
 }

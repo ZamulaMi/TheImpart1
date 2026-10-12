@@ -82,7 +82,7 @@ if (!initialArticlesFromFile) {
 let isTableInitialized = false;
 
 export async function initDb() {
-  if (isTableInitialized) return;
+  if (isTableInitialized || !isCloudflareD1Configured()) return;
 
   try {
     await safeExecuteSql(async (sql) => {
@@ -129,6 +129,7 @@ function safeParseJsonList(raw: any, fallback: string[] = []): string[] {
 }
 
 export async function saveArticleToD1(article: Article): Promise<boolean> {
+  if (!isCloudflareD1Configured()) return false;
   const isPub = article.published !== false && String(article.published) !== 'false';
   const isPubEn =
     article.publishedEn === true ||
@@ -245,8 +246,9 @@ export async function getArticles(): Promise<Article[]> {
     }
   }
 
-  try {
-    await initDb();
+  if (isCloudflareD1Configured()) {
+    try {
+      await initDb();
     const rows = await safeExecuteSql(async (sql) => {
       return await sql`
         SELECT 
@@ -328,6 +330,7 @@ export async function getArticles(): Promise<Article[]> {
   } catch (error) {
     console.warn('Cloudflare D1 query notice in getArticles, loading from local cache:', error);
   }
+}
 
   if (localMap.size > 0) {
     const list = Array.from(localMap.values());
@@ -407,11 +410,11 @@ export async function saveArticle(article: Article): Promise<Article> {
   // 2. Резервний запис на диск
   writeArticlesToFile(inMemoryArticles);
 
-  // 3. Збереження на серверах Cloudflare D1
-  try {
-    await saveArticleToD1(fullArticle);
-  } catch (error: any) {
-    console.warn('Cloudflare D1 save notice in saveArticle:', error);
+  // 3. Збереження на серверах Cloudflare D1 (тільки якщо налаштовано, у фоновому режимі)
+  if (isCloudflareD1Configured()) {
+    saveArticleToD1(fullArticle).catch((error: any) => {
+      console.warn('Cloudflare D1 save notice in saveArticle:', error);
+    });
   }
 
   return fullArticle;
@@ -426,14 +429,13 @@ export async function deleteArticle(id: string): Promise<boolean> {
   // 2. Оновлюємо файл на диску
   writeArticlesToFile(inMemoryArticles);
 
-  // 3. Видаляємо з сервера Cloudflare D1
-  try {
-    await initDb();
-    await safeExecuteSql(async (sql) => {
+  // 3. Видаляємо з сервера Cloudflare D1 (тільки якщо налаштовано, у фоновому режимі)
+  if (isCloudflareD1Configured()) {
+    safeExecuteSql(async (sql) => {
       await sql`DELETE FROM articles WHERE id = ${targetId};`;
-    }, 15000);
-  } catch (error) {
-    console.warn('Cloudflare D1 delete notice:', error);
+    }, 4000).catch((error) => {
+      console.warn('Cloudflare D1 delete notice:', error);
+    });
   }
 
   return true;

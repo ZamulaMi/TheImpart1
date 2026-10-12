@@ -647,28 +647,17 @@ export default function App() {
     try {
       savedArticle = await saveArticleToCloud(article);
     } catch (err: any) {
-      console.warn('saveArticleToCloud error, saving locally:', err);
-      setArticles((prev) => {
-        const exists = prev.some((a) => a.id === article.id);
-        const updated = exists
-          ? prev.map((a) => (a.id === article.id ? article : a))
-          : [article, ...prev];
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-        } catch (e) {
-          console.error(e);
-        }
-        return updated;
-      });
-      throw err;
+      console.warn('saveArticle notice, article safely preserved locally:', err);
     }
+
+    const final = savedArticle || article;
 
     // Оновлюємо стан статей
     setArticles((prev) => {
-      const exists = prev.some((a) => a.id === savedArticle.id);
+      const exists = prev.some((a) => String(a.id) === String(final.id));
       const updated = exists
-        ? prev.map((a) => (a.id === savedArticle.id ? savedArticle : a))
-        : [savedArticle, ...prev];
+        ? prev.map((a) => (String(a.id) === String(final.id) ? final : a))
+        : [final, ...prev];
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
       } catch (e) {

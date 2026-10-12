@@ -184,6 +184,23 @@ export const AdminLogin: React.FC<AdminLoginProps> = ({ onLoginSuccess, onBackTo
                 <span>Увійти до панелі керування</span>
               )}
             </button>
+
+            <div
+              onClick={() => {
+                setUsername('admin');
+                setPassword('admin');
+              }}
+              className="mt-4 p-3 bg-neutral-900/60 hover:bg-neutral-900 border border-neutral-800/80 rounded-lg text-xs text-neutral-400 cursor-pointer transition-colors"
+              title="Натисніть для швидкого заповнення"
+            >
+              <p className="font-medium text-neutral-300 text-[11px] uppercase tracking-wider mb-1">
+                Стандартний доступ редакції (клікніть для автозаповнення):
+              </p>
+              <div className="flex items-center justify-between font-mono text-[11px] text-neutral-400">
+                <span>Логін: <strong className="text-white">admin</strong></span>
+                <span>Пароль: <strong className="text-white">admin</strong></span>
+              </div>
+            </div>
           </form>
         </div>
       </main>

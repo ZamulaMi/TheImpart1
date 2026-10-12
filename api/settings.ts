@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { safeExecuteSql } from './_db.ts';
+import { safeExecuteSql, isCloudflareD1Configured } from './_db.ts';
 import { verifyAdminToken, extractToken } from './_auth_utils.ts';
 import { initResponseHelpers, parseRequestBody } from './_helpers.ts';
 import { DEFAULT_TAXONOMIES } from '../src/utils/taxonomies.ts';
@@ -117,7 +117,7 @@ let inMemoryTaxonomies: TaxonomiesData = initialTaxFromFile || { ...DEFAULT_TAXO
 let isSettingsTableInitialized = false;
 
 async function initSettingsDb() {
-  if (isSettingsTableInitialized) return;
+  if (isSettingsTableInitialized || !isCloudflareD1Configured()) return;
   try {
     await safeExecuteSql(async (sql) => {
       // Таблиця налаштувань для Cloudflare D1 (SQLite)
@@ -156,24 +156,26 @@ async function initSettingsDb() {
 }
 
 export async function getSocialLinks(): Promise<SiteSocialLinks> {
-  try {
-    await initSettingsDb();
-    const rows = await safeExecuteSql(async (sql) => {
-      return await sql`SELECT value FROM site_settings WHERE key = 'social_links' LIMIT 1;`;
-    }, 3000);
+  if (isCloudflareD1Configured()) {
+    try {
+      await initSettingsDb();
+      const rows = await safeExecuteSql(async (sql) => {
+        return await sql`SELECT value FROM site_settings WHERE key = 'social_links' LIMIT 1;`;
+      }, 3000);
 
-    if (rows && rows.length > 0 && rows[0].value) {
-      const parsed = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
-      const combined: SiteSocialLinks = {
-        ua: { ...DEFAULT_SOCIAL_LINKS.ua, ...(parsed.ua || {}) },
-        en: { ...DEFAULT_SOCIAL_LINKS.en, ...(parsed.en || {}) },
-      };
-      inMemorySocialLinks = combined;
-      writeSettingsToFile(combined);
-      return combined;
+      if (rows && rows.length > 0 && rows[0].value) {
+        const parsed = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
+        const combined: SiteSocialLinks = {
+          ua: { ...DEFAULT_SOCIAL_LINKS.ua, ...(parsed.ua || {}) },
+          en: { ...DEFAULT_SOCIAL_LINKS.en, ...(parsed.en || {}) },
+        };
+        inMemorySocialLinks = combined;
+        writeSettingsToFile(combined);
+        return combined;
+      }
+    } catch (err) {
+      console.warn('Cloudflare D1 query error in getSocialLinks, loading disk cache:', err);
     }
-  } catch (err) {
-    console.warn('Cloudflare D1 query error in getSocialLinks, loading disk cache:', err);
   }
 
   const fromFile = readSettingsFromFile();
@@ -211,41 +213,42 @@ export async function saveSocialLinks(links: any): Promise<SiteSocialLinks> {
   inMemorySocialLinks = cleaned;
   writeSettingsToFile(cleaned);
 
-  try {
-    await initSettingsDb();
-    await safeExecuteSql(async (sql) => {
-      const jsonStr = JSON.stringify(cleaned);
-      await sql`
-        INSERT INTO site_settings (key, value, updated_at)
-        VALUES ('social_links', ${jsonStr}, CURRENT_TIMESTAMP)
-        ON CONFLICT (key) DO UPDATE
-        SET value = excluded.value, updated_at = CURRENT_TIMESTAMP;
-      `;
-    }, 4000);
-  } catch (err) {
-    console.warn('Cloudflare D1 save notice for social_links:', err);
+  if (isCloudflareD1Configured()) {
+    initSettingsDb().then(() => {
+      safeExecuteSql(async (sql) => {
+        const jsonStr = JSON.stringify(cleaned);
+        await sql`
+          INSERT INTO site_settings (key, value, updated_at)
+          VALUES ('social_links', ${jsonStr}, CURRENT_TIMESTAMP)
+          ON CONFLICT (key) DO UPDATE
+          SET value = excluded.value, updated_at = CURRENT_TIMESTAMP;
+        `;
+      }, 4000).catch((err) => console.warn('Cloudflare D1 save notice for social_links:', err));
+    }).catch(() => {});
   }
 
   return cleaned;
 }
 
 export async function getTaxonomies(): Promise<TaxonomiesData> {
-  try {
-    await initSettingsDb();
-    const rows = await safeExecuteSql(async (sql) => {
-      return await sql`SELECT value FROM site_settings WHERE key = 'taxonomies' LIMIT 1;`;
-    }, 3000);
+  if (isCloudflareD1Configured()) {
+    try {
+      await initSettingsDb();
+      const rows = await safeExecuteSql(async (sql) => {
+        return await sql`SELECT value FROM site_settings WHERE key = 'taxonomies' LIMIT 1;`;
+      }, 3000);
 
-    if (rows && rows.length > 0 && rows[0].value) {
-      const parsed = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
-      if (parsed && Array.isArray(parsed.categories)) {
-        inMemoryTaxonomies = parsed;
-        writeTaxonomiesToFile(parsed);
-        return parsed;
+      if (rows && rows.length > 0 && rows[0].value) {
+        const parsed = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
+        if (parsed && Array.isArray(parsed.categories)) {
+          inMemoryTaxonomies = parsed;
+          writeTaxonomiesToFile(parsed);
+          return parsed;
+        }
       }
+    } catch (err) {
+      console.warn('Cloudflare D1 query error in getTaxonomies:', err);
     }
-  } catch (err) {
-    console.warn('Cloudflare D1 query error in getTaxonomies:', err);
   }
 
   const fromFile = readTaxonomiesFromFile();
@@ -266,19 +269,18 @@ export async function saveTaxonomies(taxonomies: TaxonomiesData): Promise<Taxono
   inMemoryTaxonomies = safeData;
   writeTaxonomiesToFile(safeData);
 
-  try {
-    await initSettingsDb();
-    await safeExecuteSql(async (sql) => {
-      const jsonStr = JSON.stringify(safeData);
-      await sql`
-        INSERT INTO site_settings (key, value, updated_at)
-        VALUES ('taxonomies', ${jsonStr}, CURRENT_TIMESTAMP)
-        ON CONFLICT (key) DO UPDATE
-        SET value = excluded.value, updated_at = CURRENT_TIMESTAMP;
-      `;
-    }, 4000);
-  } catch (err) {
-    console.warn('Cloudflare D1 save notice for taxonomies:', err);
+  if (isCloudflareD1Configured()) {
+    initSettingsDb().then(() => {
+      safeExecuteSql(async (sql) => {
+        const jsonStr = JSON.stringify(safeData);
+        await sql`
+          INSERT INTO site_settings (key, value, updated_at)
+          VALUES ('taxonomies', ${jsonStr}, CURRENT_TIMESTAMP)
+          ON CONFLICT (key) DO UPDATE
+          SET value = excluded.value, updated_at = CURRENT_TIMESTAMP;
+        `;
+      }, 4000).catch((err) => console.warn('Cloudflare D1 save notice for taxonomies:', err));
+    }).catch(() => {});
   }
 
   return safeData;
