@@ -1,4 +1,7 @@
-import { neon } from '@neondatabase/serverless';
+/**
+ * Cloudflare D1 (SQL Database) & Cloudflare R2 (Object Storage) Client
+ * Повністю видалено Vercel та Postgres/Neon — робота суто з серверами Cloudflare.
+ */
 
 // 1. Конфігурація Cloudflare D1
 export interface CloudflareD1Config {
@@ -8,38 +11,52 @@ export interface CloudflareD1Config {
 }
 
 export function getCloudflareD1Config(): CloudflareD1Config | null {
-  const accountId =
+  const accountId = (
     process.env.CLOUDFLARE_ACCOUNT_ID ||
-    process.env.CF_ACCOUNT_ID;
+    process.env.CF_ACCOUNT_ID ||
+    ''
+  ).trim();
 
-  const databaseId =
+  const databaseId = (
     process.env.CLOUDFLARE_DATABASE_ID ||
     process.env.CLOUDFLARE_D1_DATABASE_ID ||
-    process.env.D1_DATABASE_ID;
+    process.env.D1_DATABASE_ID ||
+    ''
+  ).trim();
 
-  const apiToken =
+  const apiToken = (
     process.env.CLOUDFLARE_API_TOKEN ||
     process.env.CLOUDFLARE_D1_TOKEN ||
-    process.env.CF_API_TOKEN;
+    process.env.CF_API_TOKEN ||
+    ''
+  ).trim();
 
   if (accountId && databaseId && apiToken) {
-    return {
-      accountId: accountId.trim(),
-      databaseId: databaseId.trim(),
-      apiToken: apiToken.trim(),
-    };
+    return { accountId, databaseId, apiToken };
   }
 
   return null;
 }
 
-// 2. Виконання запитів до Cloudflare D1 через офіційний REST API
-async function queryCloudflareD1(
+export function isCloudflareD1Configured(): boolean {
+  return getCloudflareD1Config() !== null;
+}
+
+// 2. Виконання SQL-запитів до Cloudflare D1 через REST API
+export async function queryCloudflareD1(
   config: CloudflareD1Config,
   sqlText: string,
   params: any[] = []
 ): Promise<any[]> {
   const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/d1/database/${config.databaseId}/query`;
+
+  // Нормалізація параметрів для SQLite у Cloudflare D1:
+  // booleans -> 1/0, undefined -> null
+  const sanitizedParams = params.map((p) => {
+    if (p === undefined) return null;
+    if (typeof p === 'boolean') return p ? 1 : 0;
+    return p;
+  });
 
   const response = await fetch(url, {
     method: 'POST',
@@ -49,7 +66,7 @@ async function queryCloudflareD1(
     },
     body: JSON.stringify({
       sql: sqlText.trim(),
-      params: params.map((p) => (p === undefined ? null : p)),
+      params: sanitizedParams,
     }),
   });
 
@@ -72,104 +89,45 @@ async function queryCloudflareD1(
   return [];
 }
 
-// 3. Очищення рядка підключення: автоматично витягує чистий postgresql://...
-export function cleanConnectionString(raw?: string): string | undefined {
-  if (!raw) return undefined;
-  const str = raw.trim();
-
-  const match = str.match(/postgres(?:ql)?:\/\/[^\s"'`]+/i);
-  if (match) {
-    let extracted = match[0].trim();
-    extracted = extracted.replace(/[;"'`\\]+$/, '').trim();
-    return extracted;
-  }
-
-  return undefined;
-}
-
-// 4. Отримання клієнта PostgreSQL / Cloudflare Hyperdrive
-export function getNeonSql(): any | null {
-  const candidateKeys = [
-    'CLOUDFLARE_HYPERDRIVE_URL',
-    'DATABASE_URL',
-    'POSTGRES_URL',
-    'POSTGRES_PRISMA_URL',
-    'DATABASE_URL_UNPOOLED',
-    'POSTGRES_URL_NON_POOLING',
-    'POSTGRES_URL_NO_SSL',
-  ] as const;
-
-  let connectionString: string | undefined;
-
-  for (const k of candidateKeys) {
-    const val = cleanConnectionString(process.env[k]);
-    if (val) {
-      connectionString = val;
-      break;
-    }
-  }
-
-  // Якщо рядок передано через окремі змінні PGHOST / PGUSER
-  if (!connectionString && process.env.PGUSER && process.env.PGHOST && process.env.PGDATABASE) {
-    const user = process.env.PGUSER;
-    const pass = process.env.PGPASSWORD || '';
-    const host = process.env.PGHOST;
-    const db = process.env.PGDATABASE;
-    connectionString = `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(pass)}@${host}/${db}?sslmode=require`;
-  }
-
-  if (!connectionString) {
-    return null;
-  }
-
-  try {
-    return neon(connectionString);
-  } catch (err) {
-    console.warn('Hyperdrive/Postgres client initialization error:', err);
-    return null;
-  }
-}
-
-// 5. Отримання універсального клієнта бази даних (пріоритет: Cloudflare D1 -> Hyperdrive/Postgres)
+// 3. Універсальний клієнт бази даних Cloudflare D1
 export function getDbClient(): any | null {
   const d1Config = getCloudflareD1Config();
-  if (d1Config) {
-    // Повертаємо клієнт з підтримкою tagged template literals
-    const d1TaggedSql = async (
-      stringsOrQuery: TemplateStringsArray | string,
-      ...values: any[]
-    ) => {
-      let sqlText = '';
-      let params: any[] = [];
-
-      if (typeof stringsOrQuery === 'string') {
-        sqlText = stringsOrQuery;
-        params = values[0] && Array.isArray(values[0]) ? values[0] : values;
-      } else if (Array.isArray(stringsOrQuery) && (stringsOrQuery as any).raw) {
-        for (let i = 0; i < stringsOrQuery.length; i++) {
-          sqlText += stringsOrQuery[i];
-          if (i < values.length) {
-            sqlText += '?';
-            params.push(values[i]);
-          }
-        }
-      } else {
-        throw new Error('Invalid SQL input');
-      }
-
-      return await queryCloudflareD1(d1Config, sqlText, params);
-    };
-
-    return d1TaggedSql;
+  if (!d1Config) {
+    return null;
   }
 
-  return getNeonSql();
+  const d1Sql = async (
+    stringsOrQuery: TemplateStringsArray | string,
+    ...values: any[]
+  ) => {
+    let sqlText = '';
+    let params: any[] = [];
+
+    if (typeof stringsOrQuery === 'string') {
+      sqlText = stringsOrQuery;
+      params = values[0] && Array.isArray(values[0]) ? values[0] : values;
+    } else if (Array.isArray(stringsOrQuery) && (stringsOrQuery as any).raw) {
+      for (let i = 0; i < stringsOrQuery.length; i++) {
+        sqlText += stringsOrQuery[i];
+        if (i < values.length) {
+          sqlText += '?';
+          params.push(values[i]);
+        }
+      }
+    } else {
+      throw new Error('Invalid SQL input');
+    }
+
+    return await queryCloudflareD1(d1Config, sqlText, params);
+  };
+
+  return d1Sql;
 }
 
-// 6. Безпечне виконання SQL-запиту з тайм-аутом (запобігає зависанню сервера)
+// 4. Безпечне виконання SQL-запиту з тайм-аутом
 export async function safeExecuteSql<T = any>(
   sqlFn: (sql: any) => Promise<T>,
-  timeoutMs: number = 4000
+  timeoutMs: number = 6000
 ): Promise<T | null> {
   const sql = getDbClient();
   if (!sql) return null;
@@ -178,13 +136,146 @@ export async function safeExecuteSql<T = any>(
     const result = await Promise.race([
       sqlFn(sql),
       new Promise<null>((_, reject) =>
-        setTimeout(() => reject(new Error('SQL query timeout')), timeoutMs)
+        setTimeout(() => reject(new Error('Cloudflare D1 SQL timeout')), timeoutMs)
       ),
     ]);
     return result;
   } catch (err) {
-    console.warn('Safe SQL query execution warning:', err);
+    console.warn('Cloudflare D1 query error/warning:', err);
     return null;
   }
 }
 
+// 5. Конфігурація Cloudflare R2 (Сховище медіафайлів / зображень)
+export interface CloudflareR2Config {
+  accountId: string;
+  apiToken: string;
+  bucketName: string;
+  publicUrl?: string;
+}
+
+export function getCloudflareR2Config(): CloudflareR2Config | null {
+  const accountId = (
+    process.env.CLOUDFLARE_ACCOUNT_ID ||
+    process.env.CF_ACCOUNT_ID ||
+    ''
+  ).trim();
+
+  const apiToken = (
+    process.env.CLOUDFLARE_R2_TOKEN ||
+    process.env.CLOUDFLARE_API_TOKEN ||
+    process.env.CF_API_TOKEN ||
+    ''
+  ).trim();
+
+  const bucketName = (
+    process.env.CLOUDFLARE_R2_BUCKET_NAME ||
+    process.env.CLOUDFLARE_R2_BUCKET ||
+    process.env.R2_BUCKET_NAME ||
+    ''
+  ).trim();
+
+  const publicUrl = (
+    process.env.CLOUDFLARE_R2_PUBLIC_URL ||
+    process.env.R2_PUBLIC_URL ||
+    ''
+  ).trim().replace(/\/+$/, '');
+
+  if (accountId && apiToken && bucketName) {
+    return {
+      accountId,
+      apiToken,
+      bucketName,
+      publicUrl: publicUrl || undefined,
+    };
+  }
+
+  return null;
+}
+
+export function isCloudflareR2Configured(): boolean {
+  return getCloudflareR2Config() !== null;
+}
+
+// 6. Завантаження файлу в Cloudflare R2 через офіційний REST API
+export async function uploadToCloudflareR2(
+  objectKey: string,
+  buffer: Buffer,
+  mimeType: string = 'image/jpeg'
+): Promise<{ success: boolean; url: string; key: string } | null> {
+  const config = getCloudflareR2Config();
+  if (!config) return null;
+
+  const cleanKey = objectKey.replace(/^\/+/, '');
+  const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/r2/buckets/${config.bucketName}/objects/${encodeURIComponent(cleanKey)}`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${config.apiToken}`,
+        'Content-Type': mimeType,
+      },
+      body: buffer as any,
+    });
+
+    if (!response.ok) {
+      const errText = await response.text().catch(() => '');
+      throw new Error(`Cloudflare R2 upload error (${response.status}): ${errText}`);
+    }
+
+    // Якщо налаштовано публічний домен R2 (custom domain або pub-xxx.r2.dev)
+    if (config.publicUrl) {
+      return {
+        success: true,
+        url: `${config.publicUrl}/${cleanKey}`,
+        key: cleanKey,
+      };
+    }
+
+    // Якщо публічний домен не задано — роздаємо через безпечний проксі сервера /api/media/:key
+    return {
+      success: true,
+      url: `/api/media/${cleanKey}`,
+      key: cleanKey,
+    };
+  } catch (err) {
+    console.error('Cloudflare R2 upload exception:', err);
+    return null;
+  }
+}
+
+// 7. Отримання файлу з Cloudflare R2
+export async function getFromCloudflareR2(
+  objectKey: string
+): Promise<{ buffer: Buffer; contentType: string } | null> {
+  const config = getCloudflareR2Config();
+  if (!config) return null;
+
+  const cleanKey = objectKey.replace(/^\/+/, '');
+  const url = `https://api.cloudflare.com/client/v4/accounts/${config.accountId}/r2/buckets/${config.bucketName}/objects/${encodeURIComponent(cleanKey)}`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${config.apiToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const arrayBuffer = await response.arrayBuffer();
+    const contentType = response.headers.get('content-type') || 'application/octet-stream';
+
+    return {
+      buffer: Buffer.from(arrayBuffer),
+      contentType,
+    };
+  } catch (err) {
+    console.error('Cloudflare R2 fetch error:', err);
+    return null;
+  }
+}

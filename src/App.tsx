@@ -18,6 +18,8 @@ import { getAuthToken, getAuthHeaders, verifyAdminSession, logoutAdmin } from '.
 import {
   fetchSocialLinksFromCloud,
   saveSocialLinksToCloud,
+  fetchTaxonomiesFromCloud,
+  saveTaxonomiesToCloud,
   fetchArticlesFromCloud,
   saveArticleToCloud,
   deleteArticleFromCloud,
@@ -322,9 +324,14 @@ export default function App() {
 
   const [taxonomies, setTaxonomies] = useState<TaxonomiesData>(() => getStoredTaxonomies());
 
-  const handleSaveTaxonomies = (data: TaxonomiesData) => {
+  const handleSaveTaxonomies = async (data: TaxonomiesData) => {
     setTaxonomies(data);
     saveStoredTaxonomies(data);
+    try {
+      await saveTaxonomiesToCloud(data);
+    } catch (err) {
+      console.error('Cloudflare taxonomies save error:', err);
+    }
   };
 
   const [articles, setArticles] = useState<Article[]>(() => {
@@ -398,76 +405,36 @@ export default function App() {
     }
   };
 
+  const fetchTaxonomiesFromDb = async () => {
+    try {
+      const cloudTax = await fetchTaxonomiesFromCloud();
+      if (cloudTax && Array.isArray(cloudTax.categories) && cloudTax.categories.length > 0) {
+        setTaxonomies(cloudTax);
+        saveStoredTaxonomies(cloudTax);
+      }
+    } catch (e) {
+      console.warn('Cloudflare taxonomies fetch notice:', e);
+    }
+  };
+
   const fetchSocialLinksFromDb = async () => {
-    // 1. Пряме завантаження з хмарної бази даних (Cloudflare D1 / API)
     try {
       const cloudLinks = await fetchSocialLinksFromCloud();
-      if (cloudLinks && typeof cloudLinks === 'object') {
+      if (cloudLinks && typeof cloudLinks === 'object' && cloudLinks.ua) {
         setSocialLinks(cloudLinks);
         try {
           localStorage.setItem(SOCIAL_STORAGE_KEY, JSON.stringify(cloudLinks));
         } catch (e) {
           console.error(e);
         }
-        return;
       }
     } catch (e) {
-      console.warn('Cloud database direct fetch notice:', e);
-    }
-
-    // 2. Резервне завантаження через /api/settings
-    try {
-      const res = await fetch(`/api/settings?_t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { Accept: 'application/json' },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && typeof data === 'object') {
-          setSocialLinks(data);
-          try {
-            localStorage.setItem(SOCIAL_STORAGE_KEY, JSON.stringify(data));
-          } catch (e) {
-            console.error(e);
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('Settings endpoint unavailable, keeping existing:', err);
+      console.warn('Cloudflare social links fetch notice:', e);
     }
   };
 
   const handleSaveSocialLinks = async (links: SiteSocialLinks) => {
-    let savedSuccessfully = false;
-
-    // 1. Зберігаємо у хмарній базі даних через API
-    try {
-      await saveSocialLinksToCloud(links);
-      savedSuccessfully = true;
-    } catch (cloudErr) {
-      console.warn('Direct cloud save error, falling back to server route:', cloudErr);
-    }
-
-    // 2. Додатковий фоновий бекап на локальний сервер
-    try {
-      await fetch(`/api/settings?_t=${Date.now()}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify(links),
-      });
-      savedSuccessfully = true;
-    } catch (serverErr) {
-      // Якщо проксі Cloud Run видає 500, але Neon зберіг — помилку користувачу не показуємо
-    }
-
-    if (!savedSuccessfully) {
-      throw new Error('Не вдалося зберегти дані на сервері або в базі даних. Перевірте з\'єднання.');
-    }
-
+    await saveSocialLinksToCloud(links);
     setSocialLinks(links);
     try {
       localStorage.setItem(SOCIAL_STORAGE_KEY, JSON.stringify(links));
@@ -489,7 +456,7 @@ export default function App() {
   const fetchArticlesFromDb = async () => {
     let loaded = false;
 
-    // 1. Пряме завантаження статей із хмарної бази даних
+    // Завантаження статей із Cloudflare D1
     try {
       const cloudArticles = await fetchArticlesFromCloud();
       const sanitized = sanitizeArticleList(cloudArticles);
@@ -505,33 +472,10 @@ export default function App() {
         return;
       }
     } catch (e) {
-      console.warn('Cloud articles direct fetch notice:', e);
+      console.warn('Cloudflare articles fetch notice:', e);
     }
 
-    // 2. Резервне завантаження через /api/articles
-    try {
-      const res = await fetch(`/api/articles?_t=${Date.now()}`, {
-        cache: 'no-store',
-        headers: { Accept: 'application/json' },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const sanitized = sanitizeArticleList(data);
-        if (sanitized.length > 0) {
-          setArticles(sanitized);
-          loaded = true;
-          try {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized));
-          } catch (e) {
-            console.error(e);
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('Backend unavailable, checking local storage:', err);
-    }
-
-    // 3. Якщо сервер недоступний — підтягуємо локальний кеш або початкові матеріали редакції
+    // Якщо сервер недоступний — підтягуємо локальний резерв або початкові матеріали редакції
     if (!loaded) {
       try {
         const cached = localStorage.getItem(STORAGE_KEY);
@@ -555,9 +499,10 @@ export default function App() {
     setIsLoading(false);
   };
 
-  // Завантаження статей та налаштувань із бази даних
+  // Завантаження статей, рубрик та налаштувань із сервера Cloudflare D1
   useEffect(() => {
     fetchArticlesFromDb();
+    fetchTaxonomiesFromDb();
     fetchSocialLinksFromDb();
   }, []);
 
@@ -698,30 +643,10 @@ export default function App() {
   };
 
   const handleSaveArticle = async (article: Article) => {
-    let savedArticle = article;
+    // 1. Зберігаємо у Cloudflare D1 через API
+    const savedArticle = await saveArticleToCloud(article);
 
-    // 1. Зберігаємо у хмарну базу даних через API
-    try {
-      savedArticle = await saveArticleToCloud(article);
-    } catch (err) {
-      console.warn('Direct cloud save notice, trying server endpoint:', err);
-    }
-
-    // 2. Резервний фоновий бекап на сервер
-    try {
-      await fetch(`/api/articles?_t=${Date.now()}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-          ...getAuthHeaders(),
-        },
-        body: JSON.stringify(article),
-      });
-    } catch (e) {
-      // Резервний запит
-    }
-
+    // 2. Оновлюємо стан статей
     setArticles((prev) => {
       const exists = prev.some((a) => a.id === savedArticle.id);
       const updated = exists
@@ -737,26 +662,10 @@ export default function App() {
   };
 
   const handleDeleteArticle = async (id: string) => {
-    // 1. Видаляємо з хмарної бази даних
-    try {
-      await deleteArticleFromCloud(id);
-    } catch (e) {
-      console.warn('Cloud delete notice:', e);
-    }
+    // 1. Видаляємо з Cloudflare D1 через API
+    await deleteArticleFromCloud(id);
 
-    // 2. Фоновий запит на сервер
-    try {
-      await fetch(`/api/articles?id=${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-        headers: {
-          Accept: 'application/json',
-          ...getAuthHeaders(),
-        },
-      });
-    } catch (e) {
-      // Резервний запит
-    }
-
+    // 2. Оновлюємо стан статей
     setArticles((prev) => {
       const updated = prev.filter((a) => a.id !== id);
       try {

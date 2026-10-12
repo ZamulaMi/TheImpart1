@@ -1,11 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { getNeonSql, cleanConnectionString, safeExecuteSql } from './_db.ts';
+import { safeExecuteSql, isCloudflareD1Configured } from './_db.ts';
 import { verifyAdminToken, extractToken } from './_auth_utils.ts';
 import { SEED_ARTICLES } from '../src/data/seedArticles.ts';
 import { initResponseHelpers, parseRequestBody } from './_helpers.ts';
-
-export { getNeonSql, cleanConnectionString };
 
 export interface Article {
   id: string;
@@ -36,7 +34,7 @@ export interface Article {
 // Початкові статті за замовчуванням
 export const DEFAULT_ARTICLES: Article[] = SEED_ARTICLES;
 
-// Локальне збереження на диску сервера
+// Локальне кешування на диску сервера для резервного доступу та офлайн-режиму
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const ARTICLES_FILE = path.join(DATA_DIR, 'articles.json');
 const ARTICLES_TMP_FILE = '/tmp/impart_articles.json';
@@ -62,12 +60,10 @@ function readArticlesFromFile(): Article[] | null {
 function writeArticlesToFile(articles: Article[]): void {
   const payload = JSON.stringify(articles, null, 2);
 
-  // Тимчасовий резервний запис у /tmp
   try {
     fs.writeFileSync(ARTICLES_TMP_FILE, payload, 'utf-8');
   } catch {}
 
-  // Express сервер: запис у data/articles.json
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -76,7 +72,7 @@ function writeArticlesToFile(articles: Article[]): void {
   } catch {}
 }
 
-// Ініціалізуємо пам'ять з диска або початкових статей
+// Ініціалізація пам'яті
 const initialArticlesFromFile = readArticlesFromFile();
 let inMemoryArticles: Article[] = initialArticlesFromFile || [...DEFAULT_ARTICLES];
 if (!initialArticlesFromFile) {
@@ -90,63 +86,104 @@ export async function initDb() {
 
   try {
     await safeExecuteSql(async (sql) => {
+      // Таблиця статей для Cloudflare D1 (SQLite)
       await sql`
         CREATE TABLE IF NOT EXISTS articles (
-          id VARCHAR(255) PRIMARY KEY,
+          id TEXT PRIMARY KEY,
           title TEXT NOT NULL,
           excerpt TEXT,
           content TEXT NOT NULL,
-          category VARCHAR(100) DEFAULT 'Загальне',
-          author VARCHAR(255) DEFAULT 'Редакція The Impart',
+          category TEXT DEFAULT 'Загальне',
+          categories_json TEXT,
+          topics_json TEXT,
+          author TEXT DEFAULT 'Редакція The Impart',
           cover_image TEXT,
-          date VARCHAR(100),
-          read_time VARCHAR(100),
-          published BOOLEAN DEFAULT true,
-          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          date TEXT,
+          read_time TEXT,
+          published INTEGER DEFAULT 1,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
           title_en TEXT,
           excerpt_en TEXT,
           content_en TEXT,
-          category_en VARCHAR(100),
-          published_en BOOLEAN DEFAULT false
+          category_en TEXT,
+          categories_en_json TEXT,
+          topics_en_json TEXT,
+          published_en INTEGER DEFAULT 0
         );
       `;
+
+      // Безпечна міграція додаткових колонок на випадок старішої схеми D1
+      try {
+        await sql`ALTER TABLE articles ADD COLUMN categories_json TEXT;`;
+      } catch {}
+      try {
+        await sql`ALTER TABLE articles ADD COLUMN topics_json TEXT;`;
+      } catch {}
+      try {
+        await sql`ALTER TABLE articles ADD COLUMN categories_en_json TEXT;`;
+      } catch {}
+      try {
+        await sql`ALTER TABLE articles ADD COLUMN topics_en_json TEXT;`;
+      } catch {}
 
       const rows = await sql`SELECT count(*) as count FROM articles;`;
       if (parseInt(rows[0]?.count || '0', 10) === 0) {
         const toSeed = inMemoryArticles.length > 0 ? inMemoryArticles : DEFAULT_ARTICLES;
         for (const a of toSeed) {
+          const cat = a.category || (a.categories && a.categories.length > 0 ? a.categories[0] : 'Загальне');
+          const catsJson = JSON.stringify(a.categories || [cat]);
+          const topsJson = JSON.stringify(a.topics || []);
+          const catsEnJson = JSON.stringify(a.categoriesEn || (a.categoryEn ? [a.categoryEn] : []));
+          const topsEnJson = JSON.stringify(a.topicsEn || []);
+
           await sql`
             INSERT INTO articles (
-              id, title, excerpt, content, category, author, cover_image, date, read_time, published,
-              title_en, excerpt_en, content_en, category_en, published_en
+              id, title, excerpt, content, category, categories_json, topics_json,
+              author, cover_image, date, read_time, published, created_at,
+              title_en, excerpt_en, content_en, category_en, categories_en_json, topics_en_json, published_en
             )
             VALUES (
               ${a.id}, 
               ${a.title}, 
               ${a.excerpt}, 
               ${a.content}, 
-              ${a.category}, 
-              ${a.author}, 
+              ${cat},
+              ${catsJson},
+              ${topsJson},
+              ${a.author || 'Редакція The Impart'}, 
               ${a.coverImage || null}, 
               ${a.date}, 
               ${a.readTime || null}, 
-              ${a.published},
-              ${a.titleEn || null},
-              ${a.excerptEn || null},
-              ${a.contentEn || null},
+              ${a.published ? 1 : 0},
+              ${a.createdAt || new Date().toISOString()},
+              ${a.titleEn || null}, 
+              ${a.excerptEn || null}, 
+              ${a.contentEn || null}, 
               ${a.categoryEn || null},
-              ${a.publishedEn ?? false}
+              ${catsEnJson},
+              ${topsEnJson},
+              ${a.publishedEn ? 1 : 0}
             )
             ON CONFLICT (id) DO NOTHING;
           `;
         }
       }
-    }, 3000);
+    }, 5000);
 
     isTableInitialized = true;
   } catch (error) {
-    console.warn('Cloudflare/Database initDb notice (fallback active):', error);
+    console.warn('Cloudflare D1 initDb notice:', error);
   }
+}
+
+function safeParseJsonList(raw: any, fallback: string[] = []): string[] {
+  if (!raw) return fallback;
+  if (Array.isArray(raw)) return raw.map(String).filter(Boolean);
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed.map(String).filter(Boolean);
+  } catch {}
+  return fallback;
 }
 
 export async function getArticles(): Promise<Article[]> {
@@ -159,7 +196,9 @@ export async function getArticles(): Promise<Article[]> {
           title, 
           excerpt, 
           content, 
-          category, 
+          category,
+          categories_json as "categoriesJson",
+          topics_json as "topicsJson",
           author, 
           cover_image as "coverImage", 
           date, 
@@ -170,38 +209,53 @@ export async function getArticles(): Promise<Article[]> {
           excerpt_en as "excerptEn",
           content_en as "contentEn",
           category_en as "categoryEn",
+          categories_en_json as "categoriesEnJson",
+          topics_en_json as "topicsEnJson",
           published_en as "publishedEn"
         FROM articles 
         ORDER BY created_at DESC;
       `;
-    }, 3000);
+    }, 4000);
 
     if (rows && rows.length > 0) {
-      const mapped = rows.map((r: any) => ({
-        id: String(r.id),
-        title: String(r.title || ''),
-        excerpt: String(r.excerpt || ''),
-        content: String(r.content || ''),
-        category: String(r.category || 'Загальне'),
-        author: String(r.author || 'Редакція The Impart'),
-        coverImage: r.coverImage || undefined,
-        date: String(r.date || ''),
-        readTime: r.readTime ? String(r.readTime) : undefined,
-        createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : undefined,
-        published: r.published === true || String(r.published) === 'true' || r.published === 1,
-        titleEn: r.titleEn ? String(r.titleEn) : undefined,
-        excerptEn: r.excerptEn ? String(r.excerptEn) : undefined,
-        contentEn: r.contentEn ? String(r.contentEn) : undefined,
-        categoryEn: r.categoryEn ? String(r.categoryEn) : undefined,
-        publishedEn: r.publishedEn === true || String(r.publishedEn) === 'true' || r.publishedEn === 1,
-      }));
+      const mapped: Article[] = rows.map((r: any) => {
+        const cat = String(r.category || 'Загальне');
+        const categories = safeParseJsonList(r.categoriesJson, cat ? cat.split(',').map((s) => s.trim()) : ['Загальне']);
+        const topics = safeParseJsonList(r.topicsJson, []);
+        const catEn = r.categoryEn ? String(r.categoryEn) : undefined;
+        const categoriesEn = safeParseJsonList(r.categoriesEnJson, catEn ? catEn.split(',').map((s) => s.trim()) : []);
+        const topicsEn = safeParseJsonList(r.topicsEnJson, []);
+
+        return {
+          id: String(r.id),
+          title: String(r.title || ''),
+          excerpt: String(r.excerpt || ''),
+          content: String(r.content || ''),
+          category: categories.join(', ') || cat,
+          categories,
+          topics,
+          author: String(r.author || 'Редакція The Impart'),
+          coverImage: r.coverImage || undefined,
+          date: String(r.date || ''),
+          readTime: r.readTime ? String(r.readTime) : undefined,
+          createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : undefined,
+          published: r.published === 1 || r.published === true || String(r.published) === 'true',
+          titleEn: r.titleEn ? String(r.titleEn) : undefined,
+          excerptEn: r.excerptEn ? String(r.excerptEn) : undefined,
+          contentEn: r.contentEn ? String(r.contentEn) : undefined,
+          categoryEn: categoriesEn.length > 0 ? categoriesEn.join(', ') : catEn,
+          categoriesEn,
+          topicsEn,
+          publishedEn: r.publishedEn === 1 || r.publishedEn === true || String(r.publishedEn) === 'true',
+        };
+      });
 
       inMemoryArticles = mapped;
       writeArticlesToFile(mapped);
       return mapped;
     }
   } catch (error) {
-    console.warn('Cloudflare/Database query error in getArticles, loading from disk/memory:', error);
+    console.warn('Cloudflare D1 query error in getArticles, loading from disk cache:', error);
   }
 
   const fromFile = readArticlesFromFile();
@@ -221,7 +275,6 @@ export async function saveArticle(article: Article): Promise<Article> {
   const title = String(article.title || '').trim();
   const excerpt = String(article.excerpt || '').trim();
   const content = String(article.content || '').trim();
-  const category = String(article.category || 'Загальне').trim();
   const author = String(article.author || 'Редакція The Impart').trim();
   const coverImage = article.coverImage ? String(article.coverImage).trim() : undefined;
   const date = String(article.date || new Date().toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' }));
@@ -231,27 +284,30 @@ export async function saveArticle(article: Article): Promise<Article> {
   const titleEn = article.titleEn ? String(article.titleEn).trim() : undefined;
   const excerptEn = article.excerptEn ? String(article.excerptEn).trim() : undefined;
   const contentEn = article.contentEn ? String(article.contentEn).trim() : undefined;
-  const categoryEn = article.categoryEn ? String(article.categoryEn).trim() : undefined;
 
   const categories = Array.isArray(article.categories) && article.categories.length > 0
     ? article.categories.map((c) => String(c).trim()).filter(Boolean)
-    : (category ? [category] : []);
+    : (article.category ? article.category.split(',').map((c) => c.trim()).filter(Boolean) : ['Загальне']);
+  const category = categories.join(', ') || 'Загальне';
+
   const categoriesEn = Array.isArray(article.categoriesEn) && article.categoriesEn.length > 0
     ? article.categoriesEn.map((c) => String(c).trim()).filter(Boolean)
-    : (categoryEn ? [categoryEn] : []);
+    : (article.categoryEn ? article.categoryEn.split(',').map((c) => c.trim()).filter(Boolean) : []);
+  const categoryEn = categoriesEn.join(', ') || undefined;
+
   const topics = Array.isArray(article.topics)
     ? article.topics.map((t) => String(t).trim()).filter(Boolean)
-    : undefined;
+    : [];
   const topicsEn = Array.isArray(article.topicsEn)
     ? article.topicsEn.map((t) => String(t).trim()).filter(Boolean)
-    : undefined;
+    : [];
 
   const fullArticle: Article = {
     id,
     title,
     excerpt,
     content,
-    category: categories.join(', ') || category,
+    category,
     categories,
     topics,
     author,
@@ -263,13 +319,13 @@ export async function saveArticle(article: Article): Promise<Article> {
     titleEn,
     excerptEn,
     contentEn,
-    categoryEn: categoriesEn.join(', ') || categoryEn,
+    categoryEn,
     categoriesEn,
     topicsEn,
     publishedEn: isPubEn,
   };
 
-  // 1. Миттєво оновлюємо пам'ять
+  // 1. Оновлення в оперативній пам'яті сервера
   const existingIdx = inMemoryArticles.findIndex((a) => a.id === id);
   if (existingIdx >= 0) {
     inMemoryArticles[existingIdx] = fullArticle;
@@ -277,40 +333,53 @@ export async function saveArticle(article: Article): Promise<Article> {
     inMemoryArticles = [fullArticle, ...inMemoryArticles];
   }
 
-  // 2. Миттєво записуємо у файл
+  // 2. Резервний запис на диск
   writeArticlesToFile(inMemoryArticles);
 
-  // 3. Синхронізуємо з хмарною базою даних (Cloudflare D1 / Hyperdrive) з безпечним тайм-аутом
+  // 3. Збереження на серверах Cloudflare D1
   try {
     await initDb();
     await safeExecuteSql(async (sql) => {
+      const catsJson = JSON.stringify(categories);
+      const topsJson = JSON.stringify(topics);
+      const catsEnJson = JSON.stringify(categoriesEn);
+      const topsEnJson = JSON.stringify(topicsEn);
+
       await sql`
         INSERT INTO articles (
-          id, title, excerpt, content, category, author, cover_image, date, read_time, published,
-          title_en, excerpt_en, content_en, category_en, published_en
+          id, title, excerpt, content, category, categories_json, topics_json,
+          author, cover_image, date, read_time, published, created_at,
+          title_en, excerpt_en, content_en, category_en, categories_en_json, topics_en_json, published_en
         )
         VALUES (
           ${id}, 
           ${title}, 
           ${excerpt}, 
           ${content}, 
-          ${category}, 
+          ${category},
+          ${catsJson},
+          ${topsJson},
           ${author}, 
           ${coverImage || null}, 
           ${date}, 
           ${readTime || null}, 
-          ${isPub},
-          ${titleEn || null},
-          ${excerptEn || null},
-          ${contentEn || null},
+          ${isPub ? 1 : 0},
+          ${createdAt},
+          ${titleEn || null}, 
+          ${excerptEn || null}, 
+          ${contentEn || null}, 
           ${categoryEn || null},
-          ${isPubEn}
+          ${catsEnJson},
+          ${topsEnJson},
+          ${isPubEn ? 1 : 0}
         )
         ON CONFLICT (id) DO UPDATE SET
           title = excluded.title,
           excerpt = excluded.excerpt,
           content = excluded.content,
           category = excluded.category,
+          categories_json = excluded.categories_json,
+          topics_json = excluded.topics_json,
           author = excluded.author,
           cover_image = excluded.cover_image,
           date = excluded.date,
@@ -320,11 +389,13 @@ export async function saveArticle(article: Article): Promise<Article> {
           excerpt_en = excluded.excerpt_en,
           content_en = excluded.content_en,
           category_en = excluded.category_en,
+          categories_en_json = excluded.categories_en_json,
+          topics_en_json = excluded.topics_en_json,
           published_en = excluded.published_en;
       `;
-    }, 3500);
+    }, 4500);
   } catch (error: any) {
-    console.warn('Cloudflare save notice (article is saved locally):', error);
+    console.warn('Cloudflare D1 save notice:', error);
   }
 
   return fullArticle;
@@ -339,14 +410,14 @@ export async function deleteArticle(id: string): Promise<boolean> {
   // 2. Оновлюємо файл на диску
   writeArticlesToFile(inMemoryArticles);
 
-  // 3. Синхронізуємо видалення з хмарної бази даних
+  // 3. Видаляємо з сервера Cloudflare D1
   try {
     await initDb();
     await safeExecuteSql(async (sql) => {
       await sql`DELETE FROM articles WHERE id = ${targetId};`;
-    }, 2500);
+    }, 3500);
   } catch (error) {
-    console.warn('Cloudflare delete notice:', error);
+    console.warn('Cloudflare D1 delete notice:', error);
   }
 
   return true;
@@ -399,6 +470,8 @@ export default async function handler(req: any, res: any) {
         excerpt: body.excerpt ? String(body.excerpt).trim() : '',
         content: body.content ? String(body.content).trim() : '',
         category: body.category ? String(body.category).trim() : 'Загальне',
+        categories: Array.isArray(body.categories) ? body.categories : undefined,
+        topics: Array.isArray(body.topics) ? body.topics : undefined,
         author: body.author ? String(body.author).trim() : 'Редакція The Impart',
         coverImage: body.coverImage ? String(body.coverImage).trim() : undefined,
         date: body.date ? String(body.date) : new Date().toLocaleDateString('uk-UA', { day: 'numeric', month: 'long', year: 'numeric' }),
@@ -410,6 +483,8 @@ export default async function handler(req: any, res: any) {
         excerptEn: body.excerptEn ? String(body.excerptEn).trim() : undefined,
         contentEn: body.contentEn ? String(body.contentEn).trim() : undefined,
         categoryEn: body.categoryEn ? String(body.categoryEn).trim() : undefined,
+        categoriesEn: Array.isArray(body.categoriesEn) ? body.categoriesEn : undefined,
+        topicsEn: Array.isArray(body.topicsEn) ? body.topicsEn : undefined,
         publishedEn: body.publishedEn === true || String(body.publishedEn) === 'true',
       });
 

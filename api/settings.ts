@@ -1,8 +1,10 @@
 import fs from 'fs';
 import path from 'path';
-import { getNeonSql, safeExecuteSql } from './_db.ts';
+import { safeExecuteSql } from './_db.ts';
 import { verifyAdminToken, extractToken } from './_auth_utils.ts';
 import { initResponseHelpers, parseRequestBody } from './_helpers.ts';
+import { DEFAULT_TAXONOMIES } from '../src/utils/taxonomies.ts';
+import { TaxonomiesData } from '../src/types.ts';
 
 export interface SocialLinksSet {
   telegram?: string;
@@ -34,10 +36,13 @@ export const DEFAULT_SOCIAL_LINKS: SiteSocialLinks = {
   },
 };
 
-// Каталоги для локального збереження на сервері
+// Каталоги для локального резервного збереження
 const DATA_DIR = path.resolve(process.cwd(), 'data');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const TMP_SETTINGS_FILE = '/tmp/impart_settings.json';
+
+const TAXONOMIES_FILE = path.join(DATA_DIR, 'taxonomies.json');
+const TMP_TAXONOMIES_FILE = '/tmp/impart_taxonomies.json';
 
 function readSettingsFromFile(): SiteSocialLinks | null {
   const paths = [TMP_SETTINGS_FILE, SETTINGS_FILE];
@@ -60,13 +65,9 @@ function readSettingsFromFile(): SiteSocialLinks | null {
 
 function writeSettingsToFile(data: SiteSocialLinks): void {
   const payload = JSON.stringify(data, null, 2);
-
-  // Резервний запис у /tmp
   try {
     fs.writeFileSync(TMP_SETTINGS_FILE, payload, 'utf-8');
   } catch {}
-
-  // Express сервер: запис у data/settings.json
   try {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -75,9 +76,43 @@ function writeSettingsToFile(data: SiteSocialLinks): void {
   } catch {}
 }
 
-// Ініціалізація початкового кешу в пам'яті
+function readTaxonomiesFromFile(): TaxonomiesData | null {
+  const paths = [TMP_TAXONOMIES_FILE, TAXONOMIES_FILE];
+  for (const p of paths) {
+    try {
+      if (fs.existsSync(p)) {
+        const content = fs.readFileSync(p, 'utf-8');
+        if (content && content.trim()) {
+          const parsed = JSON.parse(content);
+          if (parsed && Array.isArray(parsed.categories)) {
+            return parsed;
+          }
+        }
+      }
+    } catch {}
+  }
+  return null;
+}
+
+function writeTaxonomiesToFile(data: TaxonomiesData): void {
+  const payload = JSON.stringify(data, null, 2);
+  try {
+    fs.writeFileSync(TMP_TAXONOMIES_FILE, payload, 'utf-8');
+  } catch {}
+  try {
+    if (!fs.existsSync(DATA_DIR)) {
+      fs.mkdirSync(DATA_DIR, { recursive: true });
+    }
+    fs.writeFileSync(TAXONOMIES_FILE, payload, 'utf-8');
+  } catch {}
+}
+
+// Початковий кеш у пам'яті
 const initialFromFile = readSettingsFromFile();
 let inMemorySocialLinks: SiteSocialLinks = initialFromFile || { ...DEFAULT_SOCIAL_LINKS };
+
+const initialTaxFromFile = readTaxonomiesFromFile();
+let inMemoryTaxonomies: TaxonomiesData = initialTaxFromFile || { ...DEFAULT_TAXONOMIES };
 
 let isSettingsTableInitialized = false;
 
@@ -85,36 +120,47 @@ async function initSettingsDb() {
   if (isSettingsTableInitialized) return;
   try {
     await safeExecuteSql(async (sql) => {
+      // Таблиця налаштувань для Cloudflare D1 (SQLite)
       await sql`
         CREATE TABLE IF NOT EXISTS site_settings (
-          key VARCHAR(100) PRIMARY KEY,
+          key TEXT PRIMARY KEY,
           value TEXT NOT NULL,
-          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
       `;
 
-      const existing = await sql`SELECT value FROM site_settings WHERE key = 'social_links' LIMIT 1;`;
-      if (!existing || existing.length === 0) {
+      // Ініціалізація соцмереж
+      const existingSocial = await sql`SELECT value FROM site_settings WHERE key = 'social_links' LIMIT 1;`;
+      if (!existingSocial || existingSocial.length === 0) {
         await sql`
           INSERT INTO site_settings (key, value)
           VALUES ('social_links', ${JSON.stringify(inMemorySocialLinks)})
           ON CONFLICT (key) DO NOTHING;
         `;
       }
-    }, 2500);
+
+      // Ініціалізація рубрик та тем (taxonomies)
+      const existingTax = await sql`SELECT value FROM site_settings WHERE key = 'taxonomies' LIMIT 1;`;
+      if (!existingTax || existingTax.length === 0) {
+        await sql`
+          INSERT INTO site_settings (key, value)
+          VALUES ('taxonomies', ${JSON.stringify(inMemoryTaxonomies)})
+          ON CONFLICT (key) DO NOTHING;
+        `;
+      }
+    }, 4000);
     isSettingsTableInitialized = true;
   } catch (err) {
-    console.warn('Database initialization warning for site_settings (fallback active):', err);
+    console.warn('Cloudflare D1 initialization warning for site_settings:', err);
   }
 }
 
 export async function getSocialLinks(): Promise<SiteSocialLinks> {
-  // 1. Спроба завантажити з хмарної бази даних з безпечним тайм-аутом
   try {
     await initSettingsDb();
     const rows = await safeExecuteSql(async (sql) => {
       return await sql`SELECT value FROM site_settings WHERE key = 'social_links' LIMIT 1;`;
-    }, 2500);
+    }, 3000);
 
     if (rows && rows.length > 0 && rows[0].value) {
       const parsed = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
@@ -127,17 +173,15 @@ export async function getSocialLinks(): Promise<SiteSocialLinks> {
       return combined;
     }
   } catch (err) {
-    console.warn('Database query error in getSocialLinks, falling back to disk/memory:', err);
+    console.warn('Cloudflare D1 query error in getSocialLinks, loading disk cache:', err);
   }
 
-  // 2. Якщо база спить або недоступна — читаємо з локального файлу
   const fromFile = readSettingsFromFile();
   if (fromFile) {
     inMemorySocialLinks = fromFile;
     return fromFile;
   }
 
-  // 3. Резервне повернення з пам'яті
   return inMemorySocialLinks;
 }
 
@@ -164,13 +208,9 @@ export async function saveSocialLinks(links: any): Promise<SiteSocialLinks> {
     },
   };
 
-  // 1. Оновлюємо пам'ять
   inMemorySocialLinks = cleaned;
-
-  // 2. Зберігаємо у файл
   writeSettingsToFile(cleaned);
 
-  // 3. Синхронізація з хмарною базою даних з тайм-аутом
   try {
     await initSettingsDb();
     await safeExecuteSql(async (sql) => {
@@ -179,14 +219,69 @@ export async function saveSocialLinks(links: any): Promise<SiteSocialLinks> {
         INSERT INTO site_settings (key, value, updated_at)
         VALUES ('social_links', ${jsonStr}, CURRENT_TIMESTAMP)
         ON CONFLICT (key) DO UPDATE
-        SET value = ${jsonStr}, updated_at = CURRENT_TIMESTAMP;
+        SET value = excluded.value, updated_at = CURRENT_TIMESTAMP;
       `;
-    }, 3000);
+    }, 4000);
   } catch (err) {
-    console.warn('Cloudflare/Database sync notice: settings saved locally:', err);
+    console.warn('Cloudflare D1 save notice for social_links:', err);
   }
 
   return cleaned;
+}
+
+export async function getTaxonomies(): Promise<TaxonomiesData> {
+  try {
+    await initSettingsDb();
+    const rows = await safeExecuteSql(async (sql) => {
+      return await sql`SELECT value FROM site_settings WHERE key = 'taxonomies' LIMIT 1;`;
+    }, 3000);
+
+    if (rows && rows.length > 0 && rows[0].value) {
+      const parsed = typeof rows[0].value === 'string' ? JSON.parse(rows[0].value) : rows[0].value;
+      if (parsed && Array.isArray(parsed.categories)) {
+        inMemoryTaxonomies = parsed;
+        writeTaxonomiesToFile(parsed);
+        return parsed;
+      }
+    }
+  } catch (err) {
+    console.warn('Cloudflare D1 query error in getTaxonomies:', err);
+  }
+
+  const fromFile = readTaxonomiesFromFile();
+  if (fromFile) {
+    inMemoryTaxonomies = fromFile;
+    return fromFile;
+  }
+
+  return inMemoryTaxonomies;
+}
+
+export async function saveTaxonomies(taxonomies: TaxonomiesData): Promise<TaxonomiesData> {
+  const safeData: TaxonomiesData = {
+    categories: Array.isArray(taxonomies?.categories) ? taxonomies.categories : [],
+    topics: Array.isArray(taxonomies?.topics) ? taxonomies.topics : [],
+  };
+
+  inMemoryTaxonomies = safeData;
+  writeTaxonomiesToFile(safeData);
+
+  try {
+    await initSettingsDb();
+    await safeExecuteSql(async (sql) => {
+      const jsonStr = JSON.stringify(safeData);
+      await sql`
+        INSERT INTO site_settings (key, value, updated_at)
+        VALUES ('taxonomies', ${jsonStr}, CURRENT_TIMESTAMP)
+        ON CONFLICT (key) DO UPDATE
+        SET value = excluded.value, updated_at = CURRENT_TIMESTAMP;
+      `;
+    }, 4000);
+  } catch (err) {
+    console.warn('Cloudflare D1 save notice for taxonomies:', err);
+  }
+
+  return safeData;
 }
 
 export default async function handler(req: any, res: any) {
@@ -196,7 +291,7 @@ export default async function handler(req: any, res: any) {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept');
   res.setHeader('Content-Type', 'application/json');
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
 
   try {
     if (req.method === 'OPTIONS') {

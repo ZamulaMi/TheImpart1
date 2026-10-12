@@ -1,4 +1,4 @@
-import { Article, SiteSocialLinks } from '../types';
+import { Article, SiteSocialLinks, TaxonomiesData } from '../types';
 import { getAuthHeaders } from './auth';
 import { formatErrorMessage } from '../utils/errors';
 
@@ -21,42 +21,73 @@ export async function fetchSocialLinksFromCloud(): Promise<SiteSocialLinks | nul
 }
 
 export async function saveSocialLinksToCloud(links: SiteSocialLinks): Promise<SiteSocialLinks> {
+  const res = await fetch(`/api/settings?_t=${Date.now()}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(links),
+  });
+
+  const text = await res.text().catch(() => '');
+  let data: any = {};
   try {
-    const res = await fetch(`/api/settings?_t=${Date.now()}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...getAuthHeaders(),
-      },
-      body: JSON.stringify(links),
-    });
-
-    if (res) {
-      const text = await res.text().catch(() => '');
-      let data: any = {};
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = { error: text };
-      }
-
-      if (res.ok) {
-        return (data && typeof data === 'object' && data.ua) ? (data as SiteSocialLinks) : links;
-      }
-
-      if (res.status === 400 || res.status === 401) {
-        throw new Error(formatErrorMessage(data.error || data, 'Не вдалося зберегти налаштування на сервері'));
-      }
-    }
-  } catch (err: any) {
-    if (err.message && !err.message.includes('server error')) {
-      throw err;
-    }
+    data = JSON.parse(text);
+  } catch {
+    data = { error: text };
   }
 
-  // Якщо сервер тимчасово недоступний, повертаємо передані налаштування
-  return links;
+  if (res.ok) {
+    return (data && typeof data === 'object' && data.ua) ? (data as SiteSocialLinks) : links;
+  }
+
+  throw new Error(formatErrorMessage(data?.error || data, 'Не вдалося зберегти налаштування на сервері Cloudflare'));
+}
+
+export async function fetchTaxonomiesFromCloud(): Promise<TaxonomiesData | null> {
+  try {
+    const res = await fetch(`/api/taxonomies?_t=${Date.now()}`, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const data = await res.json().catch(() => null);
+      if (data && Array.isArray(data.categories)) {
+        return data as TaxonomiesData;
+      }
+    }
+  } catch (err) {
+    console.warn('API fetchTaxonomies notice:', err);
+  }
+  return null;
+}
+
+export async function saveTaxonomiesToCloud(taxonomies: TaxonomiesData): Promise<TaxonomiesData> {
+  const res = await fetch(`/api/taxonomies?_t=${Date.now()}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(taxonomies),
+  });
+
+  const text = await res.text().catch(() => '');
+  let data: any = {};
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { error: text };
+  }
+
+  if (res.ok) {
+    return (data && typeof data === 'object' && Array.isArray(data.categories)) ? (data as TaxonomiesData) : taxonomies;
+  }
+
+  throw new Error(formatErrorMessage(data?.error || data, 'Не вдалося зберегти рубрики та теми на сервері Cloudflare'));
 }
 
 export async function fetchArticlesFromCloud(): Promise<Article[] | null> {
@@ -78,60 +109,51 @@ export async function fetchArticlesFromCloud(): Promise<Article[] | null> {
 }
 
 export async function saveArticleToCloud(article: Article): Promise<Article> {
+  const res = await fetch(`/api/articles?_t=${Date.now()}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(article),
+  });
+
+  const text = await res.text().catch(() => '');
+  let data: any = {};
   try {
-    const res = await fetch(`/api/articles?_t=${Date.now()}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...getAuthHeaders(),
-      },
-      body: JSON.stringify(article),
-    });
-
-    if (res) {
-      const text = await res.text().catch(() => '');
-      let data: any = {};
-      try {
-        data = JSON.parse(text);
-      } catch {
-        data = { error: text };
-      }
-
-      if (res.ok) {
-        return (data && typeof data === 'object' && data.id) ? (data as Article) : article;
-      }
-
-      if (res.status === 400 || res.status === 401) {
-        throw new Error(formatErrorMessage(data.error || data, 'Не вдалося зберегти статтю на сервері'));
-      }
-    }
-  } catch (err: any) {
-    if (err.message && !err.message.includes('server error')) {
-      throw err;
-    }
+    data = JSON.parse(text);
+  } catch {
+    data = { error: text };
   }
 
-  // Якщо серверний маршрут тимчасово недоступний, повертаємо статтю (збережеться у локальний кеш)
-  return article;
+  if (res.ok) {
+    return (data && typeof data === 'object' && data.id) ? (data as Article) : article;
+  }
+
+  throw new Error(formatErrorMessage(data?.error || data, 'Не вдалося зберегти статтю на сервері Cloudflare'));
 }
 
 export async function deleteArticleFromCloud(id: string): Promise<boolean> {
-  try {
-    const res = await fetch(`/api/articles?id=${encodeURIComponent(id)}`, {
-      method: 'DELETE',
-      headers: {
-        Accept: 'application/json',
-        ...getAuthHeaders(),
-      },
-    });
+  const res = await fetch(`/api/articles?id=${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: {
+      Accept: 'application/json',
+      ...getAuthHeaders(),
+    },
+  });
 
-    if (res && res.ok) {
-      return true;
-    }
-  } catch (err) {
-    console.warn('API deleteArticle notice:', err);
+  if (res && res.ok) {
+    return true;
   }
 
-  return true;
+  const text = await res.text().catch(() => '');
+  let data: any = {};
+  try {
+    data = JSON.parse(text);
+  } catch {
+    data = { error: text };
+  }
+
+  throw new Error(formatErrorMessage(data?.error || data, 'Не вдалося видалити статтю на сервері Cloudflare'));
 }

@@ -4,7 +4,7 @@ import { TaxonomiesData, CategoryItem, TopicItem, Article } from '../types';
 
 interface TaxonomyManagerProps {
   taxonomies: TaxonomiesData;
-  onSaveTaxonomies: (data: TaxonomiesData) => void;
+  onSaveTaxonomies: (data: TaxonomiesData) => Promise<void> | void;
   articles: Article[];
   showNotification: (msg: string) => void;
 }

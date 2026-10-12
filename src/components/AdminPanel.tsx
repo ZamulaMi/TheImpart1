@@ -44,7 +44,7 @@ interface AdminPanelProps {
   onSaveSocialLinks: (links: SiteSocialLinks) => Promise<void> | void;
   onRefreshSocialLinks?: () => Promise<void>;
   taxonomies?: TaxonomiesData;
-  onSaveTaxonomies: (data: TaxonomiesData) => void;
+  onSaveTaxonomies: (data: TaxonomiesData) => Promise<void> | void;
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({

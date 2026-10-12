@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
-import { getNeonSql, safeExecuteSql } from './_db.ts';
+import { safeExecuteSql } from './_db.ts';
 import { initResponseHelpers, parseRequestBody } from './_helpers.ts';
 import {
   cleanEnvVal,
@@ -105,7 +105,7 @@ function writeCustomCredentialsToFile(creds: CustomCredentials | null): void {
   } catch {}
 }
 
-// Завантаження збережених облікових даних з PostgreSQL або файлу
+// Завантаження збережених облікових даних з Cloudflare D1 або файлу
 export async function ensureCredentialsLoaded(): Promise<void> {
   if (isCredentialsLoaded && inMemoryCustomCredentials) return;
 
