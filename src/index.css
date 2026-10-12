@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+html {
+  scrollbar-gutter: stable;
+}
+
+@keyframes titleSlideDown {
+  0% {
+    transform: translateY(-105%);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-title-slide-down {
+  animation: titleSlideDown 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.5s both;
+}
+
+/* Telegram Spoiler (Reader view: без сірого блоку та рамок, лише розмиття тексту) */
+.tg-spoiler {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  padding: 0 !important;
+  cursor: pointer;
+  user-select: none;
+  filter: blur(5px);
+  transition: filter 0.25s ease;
+  display: inline;
+  vertical-align: baseline;
+}
+.tg-spoiler:hover {
+  filter: blur(3px);
+}
+.tg-spoiler.revealed,
+.tg-spoiler[data-revealed="true"] {
+  filter: none !important;
+  user-select: auto !important;
+}
+
+/* Telegram Spoiler у візуальному редакторі: автор ЧІТКО бачить текст і може його редагувати */
+[contenteditable="true"] .tg-spoiler {
+  filter: none !important;
+  user-select: auto !important;
+  cursor: text !important;
+  background: rgba(0, 137, 255, 0.08) !important;
+  border-bottom: 1.5px dotted #0089ff !important;
+  border-radius: 2px !important;
+  padding: 1px 3px !important;
+  display: inline;
+}
+
+/* Стиль посилань виключно в статтях та редакторі: колір #0089ff з дуже тонкою нижньою лінією підкреслення */
+.article-rendered-html a,
+.article-content a,
+.prose a,
+.article-link,
+[contenteditable="true"] a {
+  color: #0089ff !important;
+  text-decoration: underline !important;
+  text-decoration-color: rgba(0, 137, 255, 0.45) !important;
+  text-decoration-thickness: 1px !important;
+  text-underline-offset: 3px !important;
+  transition: text-decoration-color 0.15s ease, color 0.15s ease;
+}
+.article-rendered-html a:hover,
+.article-content a:hover,
+.prose a:hover,
+.article-link:hover,
+[contenteditable="true"] a:hover {
+  color: #0070d6 !important;
+  text-decoration-color: #0089ff !important;
+}
+
+/* Іконки соцмереж у футері: виключення (сірий у спокої, чорний при наведенні) */
+.footer-social-link,
+.footer-social-link:visited {
+  color: #9ca3af !important;
+  text-decoration: none !important;
+}
+.footer-social-link:hover,
+.footer-social-link:focus,
+.footer-social-link:active {
+  color: #000000 !important;
+  text-decoration: none !important;
+}
+
+/* Callout Blocks */
+.callout-box {
+  margin: 1.5rem 0;
+  padding: 1.25rem;
+  border-radius: 0.5rem;
+  border-left-width: 4px;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+.callout-info {
+  border-left-color: #38bdf8;
+  background-color: rgba(240, 249, 255, 0.95);
+  color: #082f49;
+}
+.callout-warning {
+  border-left-color: #fbbf24;
+  background-color: rgba(254, 252, 232, 0.95);
+  color: #451a03;
+}
+.callout-success {
+  border-left-color: #34d399;
+  background-color: rgba(236, 253, 245, 0.95);
+  color: #064e3b;
+}
+.callout-danger {
+  border-left-color: #f87171;
+  background-color: rgba(254, 242, 242, 0.95);
+  color: #450a0a;
+}
+.callout-dark {
+  border-left-color: #171717;
+  background-color: #171717;
+  color: #fafafa;
+}
+.callout-quote {
+  border-left-color: #737373;
+  background-color: #fafafa;
+  color: #171717;
+}
+
+/* Article Table */
+.article-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.875rem;
+  border: 1px solid #e5e7eb;
+}
+.article-table th {
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  padding: 0.625rem 0.875rem;
+  text-align: left;
+  font-weight: 600;
+  color: #111827;
+}
+.article-table td {
+  border: 1px solid #e5e7eb;
+  padding: 0.625rem 0.875rem;
+  color: #374151;
+}
+.article-table tbody tr:nth-child(even) {
+  background-color: rgba(249, 250, 251, 0.6);
+}
+

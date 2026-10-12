@@ -1,0 +1,6 @@
+{
+  "name": "Чистий простір",
+  "description": "Мінімалістичний чистий екран для поступової розробки вебсайту.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
